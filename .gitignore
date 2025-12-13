@@ -1,0 +1,31 @@
+# === Development environment / build artifacts ===
+.vscode/
+.venv/
+__pycache__/
+target/
+compile_commands.json
+
+# === Binary / capture / archive files ===
+*.so
+*.pcap
+*.log
+*.tar
+*.tar.gz
+*.tgz
+
+# === Generated artifacts ===
+frr_fs/
+results*/
+pics*/
+conf/
+
+# === private data ===
+crpd-license
+
+# === Setup-dependent configuration ===
+docker-compose*.yml
+run_config.yaml
+hosts.json
+
+# === Exceptions: logs we intentionally keep ===
+!strace.log

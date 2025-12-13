@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "2"]]
+tag: test-frr-preload
+image: frr
+mode: preload
+partitioned: false
+debug: false
+time: 30

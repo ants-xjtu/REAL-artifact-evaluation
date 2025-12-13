@@ -1,0 +1,9 @@
+cores: ["all"]
+topos: [["fattree", "2"], ["topozoo", "Fccn"], ["dupzoo", "Fccn:2"]]
+tag: test-bird-baseline
+image: bird
+mode: baseline
+partitioned: false
+debug: false
+time: 30
+profile: true

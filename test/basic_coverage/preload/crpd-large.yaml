@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["dupzoo", "Fccn:2"]]
+tag: test-crpd-preload-large
+image: crpd
+mode: preload
+partitioned: false
+debug: false
+time: 240

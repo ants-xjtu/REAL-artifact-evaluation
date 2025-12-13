@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "2"]]
+tag: test-frr-baseline
+image: frr
+mode: baseline
+partitioned: false
+debug: false
+time: 30

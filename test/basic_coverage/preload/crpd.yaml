@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "2"]]
+tag: test-crpd-preload
+image: crpd
+mode: preload
+partitioned: false
+debug: false
+time: 30

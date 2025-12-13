@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "2"], ["dupzoo", "Fccn:2"]]
+tag: test-crpd-baseline
+image: crpd
+mode: baseline
+partitioned: false
+debug: false
+time: 30

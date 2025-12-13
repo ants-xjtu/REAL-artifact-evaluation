@@ -1,0 +1,9 @@
+cores: ["all"]
+topos: [["fattree", "6"]]
+tag: test-crpd-iterconv
+image: crpd
+mode: preload
+partitioned: 3
+debug: false
+time: 600
+profile: true
