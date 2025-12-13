@@ -1,6 +1,6 @@
 # README
 
-## Setting up a new environment
+## Setup
 
 Tested only on Ubuntu 24.04; Ubuntu 24.04 is recommended.
 
