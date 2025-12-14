@@ -18,6 +18,8 @@ frr_fs/
 results*/
 pics*/
 conf/
+batfish/conf/
+batfish/results/
 
 # === private data ===
 crpd-license
