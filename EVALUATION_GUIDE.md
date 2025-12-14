@@ -162,26 +162,23 @@ Distributed experiments: create a `hosts.json` file with the following format:
 }
 ```
 
-### Generate Batfish configuration files
-
-```bash
-cd batfish
-# Example: generate config for the frr image and a fattree topology of size 2
-./scripts/config/confgen.py frr fattree 2
-```
-
 ### Run Batfish
 Batfish parameters need to be specified in the run.sh command line.
-
+The topology construction is already included in run.sh.  
 Run an emulation experiment:
 
 ```bash
+sudo su
 source .venv/bin/activate
 cd batfish
-sudo ./run.sh 32 fattree 10
-# sudo ./run.sh 32 topozoo Kdl
-# sudo ./run.sh 32 dupzoo Fccn:2
-#./run.sh <core> <topo_type> <topo_id>
-# <core> represents the number of cores to use for execution
-# <topo_type> and <topo_id> have the same meanings as the corresponding parameters in confgen.py
+./run.sh 64 fattree 10
+# Usage: ./run.sh <core> <topo_type> <topo_id>
+#
+# <core>     : Number of cores to use for execution.
+# <topo_type> : Topology type (fattree, topozoo, dupzoo).
+# <topo_id>   : Topology identifier (e.g., Kdl, Fccn:2).
+#
+# Examples:
+# ./run.sh 64 topozoo Kdl
+# ./run.sh 64 dupzoo Fccn:2
 ```
