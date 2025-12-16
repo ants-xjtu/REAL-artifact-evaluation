@@ -55,7 +55,7 @@ parser = argparse.ArgumentParser(description="Perf/iolog compare plot")
 parser.add_argument("--iolog_file", help="Path to iolog_file")
 parser.add_argument("--perf_file", help="Path to perf_file")
 parser.add_argument("--pid_file", help="Path to pid_file")
-parser.add_argument("-o", "--output_file", help="Output file path (optional)")
+parser.add_argument("-o", "--csv_file", help="Output csv file path (optional)")
 parser.add_argument(
     "-i", "--interval", nargs="*", help="Workset time window (optional)"
 )
@@ -66,7 +66,7 @@ args = parser.parse_args()
 iolog_file = args.iolog_file
 perf_file = args.perf_file
 pid_file = args.pid_file
-output_file = args.output_file
+csv_file = args.csv_file
 plot_title = args.title
 interval_list = (
     [float(i) / 1000 for i in args.interval]
@@ -75,7 +75,7 @@ interval_list = (
 )
 
 print(
-    f"args: {perf_file}, {iolog_file}, {pid_file}, {output_file}, {plot_title}, {interval_list}"
+    f"args: {perf_file}, {iolog_file}, {pid_file}, {csv_file}, {plot_title}, {interval_list}"
 )
 
 # Parse pid_file if provided
@@ -99,9 +99,6 @@ base_timestamp = min(timestamps)
 last_timestamp = max(timestamps)
 
 # Prepare CSV output
-csv_file = (output_file if output_file else perf_file + ".time.png").replace(
-    ".png", ".csv"
-)
 with open(csv_file, "w", newline="") as f:
     writer = csv.writer(f)
     writer.writerow(["interval", "time", "perf_count", "iolog_count"])
@@ -133,20 +130,3 @@ with open(csv_file, "w", newline="") as f:
         # Write to CSV
         for t, y1, y2 in zip(x_list, y1_list, y2_list):
             writer.writerow([interval, t, y1, y2])
-
-        # Plot
-        if len(data_perf):
-            plt.plot(x_list, y1_list, label=f"{int(interval * 1000)} ms (perf)")
-        if len(data_iolog):
-            plt.plot(x_list, y2_list, label=f"{int(interval * 1000)} ms (iolog)")
-
-plt.legend()
-plt.hlines([max_gid], xmin=0, xmax=last_timestamp - base_timestamp)
-plt.title(plot_title if plot_title else "Perf vs Iolog Visualization")
-
-print(f"savefig {time.monotonic()}")
-if output_file:
-    plt.savefig(output_file, format="png")
-else:
-    plt.savefig(perf_file + ".time.png", format="png")
-print(f"savefig done {time.monotonic()}")
