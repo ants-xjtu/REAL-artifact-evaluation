@@ -8,7 +8,7 @@ import random
 import shutil
 
 BGP_BASE_AS_NUMBER = 65000
-WAN_PREFIX_PER_HOST = 10
+WAN_PREFIX_PER_HOST = 1
 
 """
 ---------------------------------
