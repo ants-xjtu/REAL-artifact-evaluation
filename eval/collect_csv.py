@@ -137,6 +137,34 @@ def safe_round(x, nd=2):
         return ""
 
 
+def read_batfish_time(path):
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            line = f.read().strip()
+            # Total time: 102.424s
+            m = re.search(r'([\d.]+)s', line)
+            if m:
+                return float(m.group(1))
+    except Exception:
+        pass
+    return None
+
+
+def read_batfish_memory(path):
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            line = f.read().strip()
+            # max: 79.000Gi
+            _, v = line.split(":", 1)
+            return parse_size_to_gib(v.strip())
+    except Exception:
+        return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("results_dir")
@@ -181,6 +209,43 @@ def main():
             "time": safe_round(total),
             "global mem": safe_round(mem_delta),
         })
+
+    # ---- Batfish results ----
+    batfish_root = os.path.join("batfish", "results")
+    batfish_images = ["bird", "frr", "crpd"]
+
+    if os.path.isdir(batfish_root):
+        print(1)
+        for name in sorted(os.listdir(batfish_root)):
+            run_dir = os.path.join(batfish_root, name)
+            if not os.path.isdir(run_dir):
+                continue
+            print(run_dir)
+
+            meta = read_meta_txt(os.path.join(run_dir, "meta.txt"))
+            if meta is None:
+                continue
+
+            info = parse_from_meta(meta)
+            print(info)
+
+            t = read_batfish_time(os.path.join(run_dir, "time"))
+            mem = read_batfish_memory(os.path.join(run_dir, "memory"))
+
+            for image in batfish_images:
+                rows.append({
+                    "id": info["id"],
+                    "Topo": info["Topo"],
+                    "Parts": "",
+                    "image": image,
+                    "mode": "batfish",
+                    "bootup": "0",
+                    "create_network": "0",
+                    "converge": safe_round(t),
+                    "time": safe_round(t),
+                    "global mem": safe_round(mem),
+                })
+
 
     fieldnames = [
         "id", "Topo", "Parts", "image", "mode",

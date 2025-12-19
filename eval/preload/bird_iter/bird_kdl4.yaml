@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["dupzoo", "Kdl:4"]]
+tag: ae
+image: bird
+mode: preload
+partitioned: 4
+debug: false
+time: 3600

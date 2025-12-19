@@ -10,6 +10,8 @@ single_run(){
 	cores=$1
 	local image=$2
 	local topo_name=$3
+	local topo_type=$4
+	local topo_id=$5
 	
 	# Validate if the specified core number is supported
 	list=(1 2 4 8 16 32 64)
@@ -34,6 +36,13 @@ single_run(){
 	mkdir -p $results_dir
 
 	exec >> ${results_dir}/run.cmd 2>&1
+
+	echo "topo=${topo_name}" >> ${results_dir}/meta.txt
+	echo "topo_id=${topo_id}" >> ${results_dir}/meta.txt
+	echo "topo_type=${topo_type}" >> ${results_dir}/meta.txt
+	echo "mode=batfish" >> ${results_dir}/meta.txt
+	echo "image=${image}" >> ${results_dir}/meta.txt
+	echo "partitioned=False" >> ${results_dir}/meta.txt
 
 	# Kill the previous docker container if it exists
 	if [ "$(docker ps -q -f name=batfish)" ]; then
@@ -105,4 +114,4 @@ elif [ $topo_type == "dupzoo" ]; then
 fi
 
 echo "Running with core=$core, topo_type=$topo_type, topo_id=$topo_id, topo_name=$topo_name"
-single_run $core frr $topo_name
+single_run $core frr $topo_name $topo_type $topo_id
