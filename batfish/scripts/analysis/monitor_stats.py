@@ -4,8 +4,6 @@ import re
 
 def get_cpu_stats(lines,results_dir):
     # For CPU, it needs to sum the utilization of each CPU to get the overall utilization, then calculate the average and maximum of the overall utilization
-    #Time	CPU0	CPU1	CPU2	CPU3
-    #07:11:21	0.000000 0.000000 0.000000 0.000000 100.000000 100.000000 0.000000 0.000000 0.000000 0.000000
     stats = []
     for line in lines:
         parts = re.split(r'\s+', line.strip())
@@ -22,10 +20,6 @@ def get_cpu_stats(lines,results_dir):
 
 def get_memory_stats(lines,results_dir):
     # For memory, it needs to find the maximum and minimum memory usage and get the difference
-    # 07:32:16
-    #             total        used        free      shared  buff/cache   available
-    # Mem:           251Gi       5.4Gi       200Gi       5.0Mi        45Gi       244Gi
-    # Swap:             0B          0B          0B
     stats = []
     i = 0
     for i in range(0,len(lines),4):

@@ -11,79 +11,90 @@ single_run(){
 	local image=$2
 	local topo_name=$3
 	
-	#check the input
+	# Validate if the specified core number is supported
 	list=(1 2 4 8 16 32 64)
 	if [[ " ${list[*]} " =~ "$1 " ]]; then
-		echo "core $1 is in the list"
+		echo "Core count $1 is supported."
 	else
-		echo "core $1 is not in the list"
+		echo "Error: Core count '$1' is not supported." >&2
+		echo "Supported values are: ${list[*]}" >&2
 		exit 1
 	fi
 	
+	# Validate if the config directory exists
 	config_dir=./conf/${image}/${topo_name}
 	if [ ! -d $config_dir ]; then
-		echo "config_dir $config_dir not found"
+		echo "Config directory $config_dir not found"
 		exit 1
 	fi
 
 	absolute_path=$(pwd)
-	
-	
 	timestamp=$(date +%Y-%m-%d_%H-%M-%S)
 	results_dir=${absolute_path}/results/batfish_${topo_name}_${image}_${cores}_${timestamp}
 	mkdir -p $results_dir
 
 	exec >> ${results_dir}/run.cmd 2>&1
 
-	# kill the previous docker container
+	# Kill the previous docker container if it exists
 	if [ "$(docker ps -q -f name=batfish)" ]; then
 		docker rm -f batfish
 	fi
 
 	core_index=$(($(($1))-1))
-	# run batfish in docker
+	# Run batfish in docker
 	docker run -d --name batfish --cpuset-cpus="0-${core_index}" -v batfish-data:/data -p 8888:8888 -p 9997:9997 -p 9996:9996 -e JAVA_TOOL_OPTIONS="-Xcomp -Xss1g -Xmx256g -Djava.util.concurrent.ForkJoinPool.common.parallelism=${cores}" batfish/allinone
-	# wait for batfish to ready
+	# Wait for batfish to be ready
 	sleep 40
 
-	# monitor cpu and memory
+	docker exec batfish bash -c "taskset -cap 0-${core_index} \$(pgrep java)"
+
+	# Monitor cpu and memory
 	./scripts/runtime/monitor_cpu.sh $results_dir $core_index &
 	monitor_cpu_pid=$!
 	./scripts/runtime/monitor_memory.sh $results_dir &
 	monitor_mem_pid=$!
 
-	output=$results_dir/record_time # Record the time of the experiment
+	# Record the time of the experiment
+	output=$results_dir/record_time 
 	http_proxy="" all_proxy="" python3 scripts/runtime/batfish_verify.py -topology $config_dir -record $output
 
+	# Log the batfish container logs
+	docker logs batfish > $results_dir/batfish.log 2>&1
+
+	# Kill the monitor processes
 	kill $monitor_cpu_pid
 	kill $monitor_mem_pid
 	docker rm -f batfish
 
-	#memory
+	# Analyze the memory usage
 	python3 scripts/analysis/monitor_stats.py -r $results_dir -t memory
-	#cpu
+	# Analyze the cpu usage
 	python3 scripts/analysis/monitor_stats.py -r $results_dir -t cpu
-	#time
-	python3 scripts/analysis/deal_time.py -r $results_dir -i $output
+	# Analyze the time usage
+	python3 scripts/analysis/deal_time.py -r $results_dir
 }
 
-# Check if correct number of arguments provided
+# Validate if the correct number of arguments is provided
 if [ $# -ne 3 ]; then
     echo "Usage: $0 <core> <topo_type> <topo_id>"
     echo "  core: number of cores (1, 2, 4, 8, 16, 32, 64)"
     echo "  topo_type: topology type (fattree, topozoo, dupzoo)"
     echo "  topo_id: topology id"
-	echo "  example: $0 32 fattree 10"
-	echo "  example: $0 32 topozoo Kdl"
-	echo "  example: $0 32 dupzoo Fccn:2"
+	echo "  example: $0 64 fattree 10"
+	echo "  example: $0 64 topozoo Kdl"
+	echo "  example: $0 64 dupzoo Fccn:2"
     exit 1
 fi
 
+# Parse the arguments
 core=$1
 topo_type=$2
 topo_id=$3
 
-# parse topo name
+# Generate the config
+python3 ./scripts/config/confgen.py frr $topo_type $topo_id
+
+# Parse the topo name
 if [ $topo_type == "fattree" ]; then
     topo_name="fattree${topo_id}"
 elif [ $topo_type == "topozoo" ]; then
