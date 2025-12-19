@@ -1,12 +1,11 @@
-import os
 from .runner_base import run_command, run_commands_for_routers
 
 
-def container_pid(image, blueprint):
+def container_pid(blueprint):
     pid_dict = {}
     records = run_commands_for_routers(
         blueprint["routers"],
-        lambda r: [f'docker inspect -f "{{{{.State.Pid}}}}" emu-real-{r["idx"]}'],
+        lambda r: [f'jq \'.pid\' /opt/lwc/containers/emu-real-{r["idx"]}/config.json'],
     )
     for rec in records:
         pid = rec.stdout.strip()
@@ -74,9 +73,9 @@ def getcmd_create_veth_pernode(router, pid_dict):
     return commands
 
 
-def create_network_veth(image, blueprint):
+def create_network_veth(blueprint):
     rec = run_command("mkdir -p /var/run/netns")
-    pid_dict, records = container_pid(image, blueprint)
+    pid_dict, records = container_pid(blueprint)
 
     records += run_commands_for_routers(
         blueprint["routers"], getcmd_create_veth_pernode, pid_dict
