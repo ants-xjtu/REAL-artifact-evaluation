@@ -20,7 +20,7 @@ process_results() {
     # sched_events
 
     ./lwc/target/release/lwc remove real-symfs
-    rm ${results_dir}/*.perf
+    # rm ${results_dir}/*.perf
 }
 
 memchart() {

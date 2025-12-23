@@ -271,8 +271,6 @@ std::vector<std::string> export_routes_cmds_crpd(const std::string &node_name, c
 }
 
 void export_routes(const std::string& image, const std::unordered_set<int>& nodes, const std::string& tag, const std::string& logPath) {
-    std::vector<std::thread> threads;
-
     std::set<int> sorted_nodes;
     for (int node : nodes) {
         sorted_nodes.insert(node);
@@ -282,28 +280,23 @@ void export_routes(const std::string& image, const std::unordered_set<int>& node
     int n_nodes = sorted_nodes.size();
     for (int node : sorted_nodes) {
         idx++;
-        if (idx >= 2 && idx + 2 < n_nodes) {
+        if (idx >= 1 && idx + 1 < n_nodes) {
             continue;
         }
-        threads.emplace_back([&, node]() {
-            std::vector<std::string> cmds;
-            if (image == "frr") {
-                cmds = export_routes_cmds_frr("emu-real-" + std::to_string(node), tag);
-            } else if (image == "bird") {
-                cmds = export_routes_cmds_bird("emu-real-" + std::to_string(node), tag);
-            } else if (image == "crpd") {
-                cmds = export_routes_cmds_crpd("emu-real-" + std::to_string(node), tag);
-            } else {
-                dbg_assert(0, "Unimplemented export_routes() for image %s\n", image.c_str());
-            }
 
-            for (const auto& cmd : cmds) {
-                execInst(cmd, logPath, false, EXEC_TIMEOUT_IN_SEC);
-            }
-        });
-    }
+        std::vector<std::string> cmds;
+        if (image == "frr") {
+            cmds = export_routes_cmds_frr("emu-real-" + std::to_string(node), tag);
+        } else if (image == "bird") {
+            cmds = export_routes_cmds_bird("emu-real-" + std::to_string(node), tag);
+        } else if (image == "crpd") {
+            cmds = export_routes_cmds_crpd("emu-real-" + std::to_string(node), tag);
+        } else {
+            dbg_assert(0, "Unimplemented export_routes() for image %s\n", image.c_str());
+        }
 
-    for (auto& t : threads) {
-        t.join();
+        for (const auto& cmd : cmds) {
+            execInst(cmd, logPath, false, EXEC_TIMEOUT_IN_SEC);
+        }
     }
 }

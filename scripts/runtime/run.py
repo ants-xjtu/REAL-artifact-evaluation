@@ -46,6 +46,19 @@ def load_config(config_file):
     with open(config_file) as f:
         return yaml.safe_load(f)
 
+def write_meta_txt(results_dir, meta):
+    # Best-effort: do not fail the run if metadata cannot be written.
+    try:
+        os.makedirs(results_dir, exist_ok=True)
+        meta_path = os.path.join(results_dir, "meta.txt")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            for k in sorted(meta.keys()):
+                v = meta[k]
+                if v is None:
+                    v = ""
+                f.write(f"{k}={v}\n")
+    except Exception as e:
+        print(f"Warning: Failed to write meta.txt in {results_dir}: {e}")
 
 def run_simulation(cfg):
     failed_runs = []
@@ -124,6 +137,22 @@ def run_simulation(cfg):
 
             results_dir = f"./results/{mode}_{image}_{topo}_{tag}_{cores}_{timestamp}"
             pics_dir = f"./pics/{mode}_{image}_{topo}_{tag}_{cores}_{timestamp}"
+            meta = {
+                "mode": mode,
+                "image": image,
+                "topo_type": topo_type,
+                "topo_id": topo_id,
+                "topo": topo,
+                "tag": tag,
+                "cores": cores,
+                "timestamp": timestamp,
+                "partitioned": str(partitioned),
+                "debug": str(bool(debug)),
+                "profile": str(bool(profile)),
+                "wait_time": wait_time,
+            }
+            write_meta_txt(results_dir, meta)
+
             print("Running:", " ".join(shlex.quote(arg) for arg in cmd))
             print(f"{results_dir} {pics_dir}")
             subprocess.run(cmd, capture_output=True)

@@ -11,8 +11,6 @@ run_case() {
 
     # start perf record in background
     bg_pids=()
-    perf record --namespaces -k CLOCK_MONOTONIC -F 299 -e cpu-clock -C ${perf_cores} -g -o ${results_dir}/perf_cycles.data &
-    bg_pids+=($!)
     perf record -k CLOCK_MONOTONIC --overwrite -e probe:${probe_event} -o ${results_dir}/perf_trace_${probe_event}.data &
     bg_pids+=($!)
     # perf record -e context-switches,cpu-migrations -C ${perf_cores} -o ${results_dir}/perf_sched.data &

@@ -131,26 +131,27 @@ bool ReplayManager::node_replay_one_msg(int node_id)
 void ReplayManager::export_iolog()
 {
     std::ofstream iolog(logPath + "/io.log");
-    std::vector<std::vector<history_msg>> src_msg_list(n_nodes + 1);
+    std::vector<std::vector<long>> src_msg_list(n_nodes + 1);
     for (auto &msgs : msg_list_) {
         for (auto msg : msgs) {
-            src_msg_list[msg.src_id].push_back(msg);
+            src_msg_list[msg.src_id].push_back(msg.timestamp);
         }
     }
     for (auto &lis : src_msg_list) {
-        sort(lis.begin(), lis.end(), [](history_msg &h1, history_msg &h2) {
-            return h1.timestamp < h2.timestamp;
+        sort(lis.begin(), lis.end(), [](long &t1, long &t2) {
+            return t1 < t2;
         });
     }
-    for (auto &msgs : src_msg_list) {
+    for (size_t i = 0; i < src_msg_list.size(); ++i) {
+        auto &msgs = src_msg_list[i];
         long last_ts = 0;
-        for (auto msg : msgs) {
+        for (auto msg_ts : msgs) {
             // only emit one line per 1ms
-            if (msg.timestamp - last_ts < MSEC_PER_NS) {
+            if (msg_ts - last_ts < MSEC_PER_NS) {
                 continue;
             }
-            last_ts = msg.timestamp;
-            iolog << std::format("{} {:.6f}\n", msg.src_id, msg.timestamp / 1e9);
+            last_ts = msg_ts;
+            iolog << std::format("{} {:.6f}\n", i, msg_ts / 1e9);
         }
     }
 }
