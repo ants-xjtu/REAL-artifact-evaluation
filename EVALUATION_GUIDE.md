@@ -1,119 +1,60 @@
-# README
+# Artifact Evaluation Guide
 
-## Setup
+First make sure your environment is working by following the "Getting Started Instructions" in [the readme file](./README.md).
 
-Tested only on Ubuntu 24.04; Ubuntu 24.04 is recommended.
+## One-liner script
 
-### Docker
+The following one-line command runs all experiments and draws all figures in the paper. If you're interested in what's happening, or running experiments step-by-step, please read [basic usage](#basic-usage) and `eval/run.sh`.
 
-Do not install Docker directly with `apt install docker`; follow the official installation instructions instead: https://docs.docker.com/engine/install/ubuntu/#install-using-the-repository. Using the TUNA (Tsinghua University) mirror is recommended for faster downloads: https://mirrors.tuna.tsinghua.edu.cn/help/docker-ce/.
-
-TODO: document required Docker version (affects image format).
-
-Required packages
-
-The runtime and build environment require:
-
-- build-essential (gcc, g++, objdump, readelf, etc.)
-- perf-related tools (linux-tools-generic)
-- cargo (Rust package manager / compiler)
-
-For debugging, it is recommended to also install:
-
-- gdb
-- strace
-
-On Ubuntu 24.04 you can install the packages with:
+> This is very slow (5 hours or more), mainly because of baseline and iterative convergence experiments, be prepared to wait.
 
 ```bash
-apt-get install -y --no-install-recommends \
-  build-essential make perl python3-venv python3-pip python3-dev virtualenv pipx \
-  iproute2 iputils-ping netcat-openbsd tcpdump nmap traceroute dnsutils ethtool \
-  nftables iptables jq ripgrep fd-find tree rsync gdb strace ltrace valgrind \
-  unzip zip tar xz-utils vim tmux less nano htop iotop sysstat lsof \
-  git git-lfs openssh-server ca-certificates gnupg software-properties-common apt-transport-https \
-  linux-tools-common linux-tools-generic linux-headers-virtual rustc cargo curl \
-  cloud-guest-utils lvm2 xfsprogs gdisk procps
+sudo ./eval/run.sh
 ```
 
-#### Version requirements
+If everything goes well, all figures in the paper should show up in `eval/figures`.
 
-Ubuntu 24 provides suitable versions by default; other distributions are untested.
+> TODO: automate distributed experiments
 
-- g++-13 or newer (for the `<format>` header)
-- python3.12 (for type annotations)
+## Artifact Claims
 
-### Configure Python virtual environment
+- Fig1
+    - This figure compares the convergence time and network buildup time **in default runtime**(normal Linux and veth-pair setup)
+    - Claim: the network buildup time should be 2-10 times longer.
+- Fig2
+    - Each vertical line in this figure indicates a timestamps at which the node actually get scheduled on CPU (rather than waiting to be scheduled) **in default runtime**.
+    - Claim: the vertical lines should be scattered throughout the later 75% or more of the entire time range.
+- Fig3
+    - Each point in this figure shows the number of routers that sends routing messages during some time interval (indicated by color) **in default runtime**.
+    - Claim: the curve should be below the total 1125 nodes (the horizontal line at top) by about 50%.
+- Fig9a-f:
+    - These figures show the total time and memory usage to derive data plane of (1) emulation with REAL (REAL), (2) emulation with default runtime (Default), and (3) simulation with Batfish (Batfish).
+    - Claims:
+        1. REAL should be always faster than Default, comparable or faster than batfish;
+        2. REAL may take slightly more memory than Defualt because it stores messages, but it should be within 20% and thus acceptable;
+        3. For large topologies, REAL can finish them through iterative convergence while Batfish and Default runs out of memory.
+- Fig10:
+    - This figure compares the convergence time and network buildup time **between REAL and default runtime**.
+    - Claim: REAL should have shorter or comparable convergence time, and much faster network buildup time.
+- Fig11-13: TBD
+- Fig14:
+    - This figure shows the time-memory tradeoff with iterative convergence.
+    - Claim: Memory could be decreased by 6x or more with increased number of partitions. The price of increased time is affordable (within 6x in most cases) and is worth the huge memory saving.
+- Fig15:
+    - This figure shows the time and memory usage for emulating ultra-large topologies using 2 distributed 64 core, 256GB machines with iterative convergence.
+    - Claims:
+        - We could utilize all 512GB memory
+        - We could emulate topology as large as FT60 (4500 nodes)
 
-```bash
-# Create a virtual environment (assume the directory will be called .venv)
-python3 -m venv .venv
-# Activate the venv
-source .venv/bin/activate
-# Install the Python dependencies from requirements.txt
-pip install -r requirements.txt
-```
+## Basic Usage
 
-### Container images
+### Run Emulations
 
-Image names are hard-coded as `real-{image}`, e.g. `real-frr`, `real-crpd`, and `real-bird`. The images include compilers (gcc, etc.) so they can be used to build `libpreload.so` inside the container. The images also include debugging tools such as `strace` and `gdb`.
-
-#### Pull prebuilt Docker images
-
-```bash
-docker pull wilsonxia/real-frr
-docker tag wilsonxia/real-frr real-frr
-docker pull wilsonxia/real-bird
-docker tag wilsonxia/real-bird real-bird
-docker pull batfish/allinone
-```
-
-##### crpd
-
-CRPD images must be downloaded manually from Juniper's official site: https://www.juniper.net/documentation/us/en/software/crpd/crpd-deployment/topics/task/crpd-linux-server-install.html. Save the image archive as `crpd.tar`.
-
-Obtain your CRPD license from Juniper and save it as `crpd-license`.
-
-```bash
-docker load -i crpd.tar
-# `docker image ls` will show the name and tag of the loaded image;
-# retag it as appropriate (version may vary):
-docker tag crpd:23.2R1.13 real-crpd:origin
-# use the Dockerfile to install the correct toolchain for compiling libpreload.so
-cd docker/crpd
-docker build . -t real-crpd
-```
-
-#### LWC images
-
-To prepare images for the LWC runtime environment:
-
-```bash
-mkdir -p /opt/lwc/{image,containers,volumes,layers}
-images=(frr crpd bird)
-for img in "${images[@]}"; do
-    sudo docker image save real-${img} -o real-${img}.tar
-    mkdir -p /opt/lwc/image/real-${img}
-    ./scripts/utils/lwc_load_img.sh real-${img}.tar real-${img}
-done
-```
-
-## Usage
-
-### Generate configuration files
-
-```bash
-# Example: generate config for the frr image and a fattree topology of size 2
-./scripts/config/confgen.py frr fattree 2
-```
-
-### Run simulations
-
-Simulation parameters are configured in `run_config.yaml`.
+Emulation parameters are configured in `run_config.yaml` by default. `test/basic_coverage/{baseline,preload}` contains some good starting points. The format is as below:
 
 ```yaml
 # run_config.yaml template:
-cores: ["0-15"]
+cores: ["all"]
 topos: [["fattree", "2"]]
 tag: test # appears in the results directory name to distinguish runs
 image: frr # options: frr, crpd, bird
@@ -121,7 +62,9 @@ mode: baseline # options: baseline, preload
 partitioned: false # enable iter-conv (partitioned convergence) or not
 debug: false # enable debug (collects logs from libpreload). Note: impacts performance.
 
-# (Optional) estimated convergence wait time (seconds). Script will wait up to this time.
+# (Optional) estimated convergence wait time (seconds). Script will wait up to this time, we should always over estimate this.
+# This is mainly useful for baseline experiments.
+# Preload experiments can automatically detect convergence and immediately stop, while it also respects this parameter in that if the system haven't converged after this amount of time, it will also stop. We should set this timer to a large value (say 1800s) and treat it as fallback plan to avoid indefinite waiting.
 # Default: 60
 time: 20
 
@@ -132,17 +75,24 @@ time: 20
 profile: false
 ```
 
-Run an emulation experiment:
+Run an emulation experiment, note how we can indicate path to config file / directory containing config files:
 
 ```bash
-sudo su
-# run.py requires Python packages, so ensure the virtualenv is activated
-source .venv/bin/activate
-./run.py       # runs according to run_config.yaml
-./run.py test  # runs all YAML files under test/
+./run.sh       # runs according to run_config.yaml
+./run.sh test  # runs all YAML files under test/
+./run.sh test/basic_coverage/preload/frr.yaml  # runs according to test/basic_coverage/preload/frr.yaml
 ```
 
-Distributed experiments: create a `hosts.json` file with the following format:
+`results/` and `pics/` directory should contain results of the experiments. The most important files are:
+
+- `pics/<exp-id>/mem.png`: memory usage graph over time
+- `pics/<exp-id>/timebar.png`: time breakdown graph
+- `pics/<exp-id>/workset.png`: working set graph over time, indicating number of active routers during a time interval (e.g. 100ms)
+- `results/<exp-id>/node_logs/emu-real-1/bgp_routes-final.log`: all routes exported on node 1
+
+### Distributed Emulation
+
+Create a `hosts.json` file with the following format on all machines participated, note that `self_id` should correspond to the ip address of each machine:
 
 ```json
 {
@@ -162,16 +112,16 @@ Distributed experiments: create a `hosts.json` file with the following format:
 }
 ```
 
+The scripts will automatically find `hosts.json` and divide jobs between multiple machines. Then copy the `run_config.yaml` to every machine, ensure they're aligned. Finally simultanously start `./run.sh` on every machine.
+
 ### Run Batfish
+
 Batfish parameters need to be specified in the run.sh command line.
 The topology construction is already included in run.sh.  
 Run an emulation experiment:
 
 ```bash
-sudo su
-source .venv/bin/activate
-cd batfish
-./run.sh 64 fattree 10
+sudo bash -c 'source .venv/bin/activate; cd batfish; ./run.sh 64 fattree 10'
 # Usage: ./run.sh <core> <topo_type> <topo_id>
 #
 # <core>     : Number of cores to use for execution.
