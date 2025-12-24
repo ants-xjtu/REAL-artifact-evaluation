@@ -7,7 +7,7 @@ Next, append the following entries to the end of your `~/.ssh/config` file:
 
 ```
 Host real-ae-jumper
-    HostName wilsonxia.cn
+    HostName ae.wilsonxia.cn
     User real-ae
     IdentityFile ~/.ssh/ae_key
 
