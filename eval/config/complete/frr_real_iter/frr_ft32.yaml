@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "32"]]
+tag: ae
+image: frr
+mode: preload
+partitioned: 8
+debug: false
+time: 3600

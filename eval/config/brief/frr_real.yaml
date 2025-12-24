@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "28"], ["dupzoo", "Kdl:3"]]
+tag: ae
+image: frr
+mode: preload
+partitioned: false
+debug: false
+time: 3600

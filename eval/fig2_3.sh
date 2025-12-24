@@ -2,7 +2,7 @@
 source .venv/bin/activate
 
 # run frr FT30 and collect extra information
-./run.sh eval/fig2.yaml
+./run.sh eval/config/fig2.yaml
 
 # plot fig2
 cp results/preload_frr_fattree30_ae-fig2_*/{converge.perf,pid_to_dockername,stage_border_ts} eval/data/

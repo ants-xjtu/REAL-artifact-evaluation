@@ -2,7 +2,7 @@
 source .venv/bin/activate
 
 # run frr FT30 with different number of parts
-./run.sh eval/fig14/
+./run.sh eval/config/fig14/
 
 # plot fig14
 ./eval/collect_csv.py results/ -o eval/data/real.csv
