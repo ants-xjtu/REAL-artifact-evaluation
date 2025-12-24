@@ -6,11 +6,11 @@ First make sure your environment is working by following the "Getting Started In
 
 The following one-line command runs all experiments and draws all figures in the paper. If you're interested in what's happening, or running experiments step-by-step, please read [basic usage](#basic-usage) and `eval/run.sh`.
 
-> This is very slow (5 hours or more), mainly because of baseline and iterative convergence experiments, be prepared to wait.
-
 ```bash
 sudo ./eval/run.sh
 ```
+
+> By default, the script executes a selected subset of end-to-end experiments (Fig. 9a–f) to reduce execution time. To run all experiments, use `sudo ./eval/run.sh complete`. Note that this full run is very time-consuming (5 hours or more), mainly due to baseline and iterative convergence experiments. Please be patient.
 
 If everything goes well, all figures in the paper should show up in `eval/figures`.
 

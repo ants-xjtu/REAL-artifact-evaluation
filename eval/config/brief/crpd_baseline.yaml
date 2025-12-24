@@ -1,0 +1,8 @@
+cores: ["all"]
+topos: [["fattree", "20"], ["topozoo", "Kdl"]]
+tag: ae
+image: crpd
+mode: baseline
+partitioned: false
+debug: false
+time: 300
