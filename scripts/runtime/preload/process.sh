@@ -15,7 +15,6 @@ process_results() {
     fi
 
     split_stages
-    workset # workset depends on pid_to_dockername
     flamegraph
     # sched_events
 
@@ -46,10 +45,6 @@ timebar() {
     for ts in $(cat ${results_dir}/switch_pods_ts.txt); do
         echo "switch_pod $ts" >> ${results_dir}/all_vlines
     done
-}
-
-workset() {
-    ./scripts/analysis/workset.py --iolog_file ${results_dir}/io.log --pid_file ${results_dir}/pid_to_dockername -o ${pics_dir}/workset.png -t "Workset Curve"
 }
 
 split_stages() {

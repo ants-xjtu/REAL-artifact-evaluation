@@ -24,12 +24,6 @@ check_file "timebar.png"
 check_file "mem.csv"
 check_file "mem.png"
 
-# preload mode requires workset files
-if [ "$MODE" = "preload" ] && [ "$PROFILE" = "true" ]; then
-    check_file "workset.csv"
-    check_file "workset.png"
-fi
-
 # profile mode requires all eventchart and svg files
 if [ "$PROFILE" = "true" ]; then
     prefixes=(converge create_containers sleep)
