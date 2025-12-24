@@ -20,7 +20,7 @@ If everything goes well, all figures in the paper should show up in `eval/figure
 
 - Fig1
     - This figure compares the convergence time and network buildup time **in default runtime**(normal Linux and veth-pair setup)
-    - Claim: the network buildup time should be 2-10 times longer.
+    - Claim: the network buildup time should be 2-10 times longer than convergence time.
 - Fig2
     - Each vertical line in this figure indicates a timestamps at which the node actually get scheduled on CPU (rather than waiting to be scheduled) **in default runtime**.
     - Claim: the vertical lines should be scattered throughout the later 75% or more of the entire time range.
@@ -87,7 +87,6 @@ Run an emulation experiment, note how we can indicate path to config file / dire
 
 - `pics/<exp-id>/mem.png`: memory usage graph over time
 - `pics/<exp-id>/timebar.png`: time breakdown graph
-- `pics/<exp-id>/workset.png`: working set graph over time, indicating number of active routers during a time interval (e.g. 100ms)
 - `results/<exp-id>/node_logs/emu-real-1/bgp_routes-final.log`: all routes exported on node 1
 
 ### Distributed Emulation
