@@ -10,7 +10,7 @@ First make sure your environment is working by following the "Getting Started In
     - Reattach to it: `tmux attach -t real-ae`
 2. Due to potential naming conflicts, running two experiments simultaneously is currently not supported. If multiple AEC members are conducting experiments, please make sure to stagger the experiment times accordingly.
 
-## One-liner script
+## One-Command Reproduction
 
 The following one-line command runs all experiments and draws all figures in the paper. If you're interested in what's happening, or running experiments step-by-step, please read [basic usage](#basic-usage) and `eval/run.sh`.
 
@@ -18,7 +18,9 @@ The following one-line command runs all experiments and draws all figures in the
 sudo ./eval/run.sh
 ```
 
-> By default, the script executes a selected subset of end-to-end experiments (Fig. 9a–f) to reduce execution time. To run all experiments, use `sudo ./eval/run.sh complete`. Note that this full run is very time-consuming (5 hours or more), mainly due to baseline and iterative convergence experiments. Please be patient.
+This evaluation takes approximately **3 hours** to complete, primarily due to the runtime of the baseline and the iterative convergence experiments. It has been deliberately reduced to the minimal experiment set necessary, while still capturing the key performance trends and the operational limits of the system.
+
+> By default, the script executes a selected subset of experiments to reduce execution time. To run all experiments, use `sudo ./eval/run.sh complete`. Note that this full run is very time-consuming (12 hours or more), mainly due to baseline and iterative convergence experiments. We recommend running the brief version only. Also, we recommend reserving no less than 200 GB of free disk space for runtime intermediates and experimental results.
 
 If everything goes well, all figures in the paper should show up in `eval/figures`.
 
