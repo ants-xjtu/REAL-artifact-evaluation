@@ -1,5 +1,5 @@
 cores: ["all"]
-topos: [["fattree", "20"], ["topozoo", "Kdl"]]
+topos: [["fattree", "24"], ["topozoo", "Kdl"]]
 tag: ae
 image: crpd
 mode: preload

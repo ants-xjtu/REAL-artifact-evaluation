@@ -45,7 +45,7 @@ def working_set():
 def bg_breakdown():
     df = pd.read_csv("eval/data/real.csv")
 
-    topo_keep = ["KDL", "KDL2", "KDL3", "FT20", "FT24", "FT28", "FT32"]
+    topo_keep = ["KDL", "KDL2", "KDL3", "FT24", "FT28", "FT32"]
 
     df = df[
         (df["image"] == "frr")
@@ -931,34 +931,34 @@ topo_list = {
         "KDL",
         "KDL2",
         "KDL3",
-        "KDL6/6",
-        "KDL6/12",
-        "FT20",
+        "KDL4/4",
         "FT24",
         "FT28",
-        "FT32",
-        "FT36/4",
+        "FT28/4",
+        "FT32/8",
+        "FT36/9",
+        "FT40/10",
+        "FT44/11",
     ]
     + [f"FT{i}/{int(i/2)}" for i in [40, 44, 48, 52]],
     "bird": [
         "KDL",
-        "KDL2",
         "KDL3",
-        "KDL6/12",
-        "FT20",
+        "KDL4/4",
         "FT24",
         "FT28",
         "FT32",
         "FT36",
         "FT40",
-        "FT44/4",
+        "FT40/4",
+        "FT44/11",
+        "FT48/12",
+        "FT52/13",
     ]
     + [f"FT{i}/{int(i/2)}" for i in [36, 40, 44, 48, 52]],
     "crpd": [
         "KDL",
-        "KDL2/4",
         "FT16",
-        "FT20",
         "FT24",
         "FT28/4",
     ]
@@ -988,7 +988,7 @@ def e2e(images="frr", yvalue="time", x_label=None, y_label="Total Time (s)", yli
     )
 
 
-small_topolist = ["KDL", "KDL2", "KDL3", "FT20", "FT24", "FT28", "FT32", "FT36"]
+small_topolist = ["KDL", "KDL2", "KDL3", "FT24", "FT28", "FT32", "FT36"]
 
 
 def breakdown_stacked(images="frr", x_label=None, y_label="Time Cost (Seconds)", ylim=None, log=True):
@@ -1134,7 +1134,7 @@ def build_jobs():
             lambda: barline_time_llcmiss(
                 csv_file="eval/data/two-phase.csv",
                 figsize=(4.2, 3.2 * 3 / 4.7),
-                group_order=["FT20", "FT24", "FT28", "FT32", "FT36"],
+                group_order=["FT24", "FT28", "FT32", "FT36"],
                 category_order=["r2i", "nor2i"],
                 legend_map={"nor2i": "W/O", "r2i": "W"},
             ),

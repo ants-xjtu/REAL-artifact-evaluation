@@ -8,7 +8,6 @@ fi
 
 ./run.sh eval/config/$mode
 cd batfish
-./run.sh 64 fattree 20
 ./run.sh 64 fattree 24
 ./run.sh 64 fattree 28
 ./run.sh 64 topozoo Kdl

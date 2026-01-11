@@ -1,8 +1,8 @@
 cores: ["all"]
-topos: [["fattree", "48"]]
+topos: [["fattree", "40"]]
 tag: ae
 image: bird
 mode: preload
-partitioned: 12
+partitioned: 4
 debug: false
 time: 3600
