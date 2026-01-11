@@ -2,6 +2,14 @@
 
 First make sure your environment is working by following the "Getting Started Instructions" in [the readme file](./README.md).
 
+## Before You Begin
+
+1. The experiment may take a long time to complete. We strongly recommend running the experiment inside a `tmux` session to ensure stable and uninterrupted execution.
+    - Start a tmux session: `tmux new -s real-ae`
+    - Detach and leave the session running in background: `Ctrl-b, then d`
+    - Reattach to it: `tmux attach -t real-ae`
+2. Due to potential naming conflicts, running two experiments simultaneously is currently not supported. If multiple AEC members are conducting experiments, please make sure to stagger the experiment times accordingly.
+
 ## One-liner script
 
 The following one-line command runs all experiments and draws all figures in the paper. If you're interested in what's happening, or running experiments step-by-step, please read [basic usage](#basic-usage) and `eval/run.sh`.
