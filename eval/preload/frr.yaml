@@ -1,8 +1,0 @@
-cores: ["all"]
-topos: [["fattree", "20"], ["fattree", "24"], ["fattree", "28"], ["topozoo", "Kdl"], ["dupzoo", "Kdl:2"], ["dupzoo", "Kdl:3"]]
-tag: ae
-image: frr
-mode: preload
-partitioned: false
-debug: false
-time: 3600
