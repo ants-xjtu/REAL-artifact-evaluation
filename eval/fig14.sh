@@ -1,8 +1,13 @@
 #!/bin/bash
 source .venv/bin/activate
 
+mode="brief"
+if [ "$#" -eq 1 ] && [ "$1" = "complete" ]; then
+    mode="complete"
+fi
+
 # run frr FT30 with different number of parts
-./run.sh eval/config/fig14/
+./run.sh eval/config/$mode/fig14/
 
 # plot fig14
 ./eval/collect_csv.py results/ -o eval/data/real.csv
