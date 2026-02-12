@@ -50,11 +50,7 @@ If everything goes well, all figures in the paper should show up in `eval/figure
 - Fig14:
     - This figure shows the time-memory tradeoff with iterative convergence.
     - Claim: Memory could be decreased by 6x or more with increased number of partitions. The price of increased time is affordable (within 6x in most cases) and is worth the huge memory saving.
-- Fig15:
-    - This figure shows the time and memory usage for emulating ultra-large topologies using 2 distributed 64 core, 256GB machines with iterative convergence.
-    - Claims:
-        - We could utilize all 512GB memory
-        - We could emulate topology as large as FT60 (4500 nodes)
+- Fig15: TBD
 
 ## Basic Usage
 
