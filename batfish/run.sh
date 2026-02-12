@@ -45,7 +45,7 @@ single_run(){
 	echo "partitioned=False" >> ${results_dir}/meta.txt
 
 	# Kill the previous docker container if it exists
-	if [ "$(docker ps -q -f name=batfish)" ]; then
+	if [ "$(docker ps -q -a -f name=batfish)" ]; then
 		docker rm -f batfish
 	fi
 
@@ -82,14 +82,6 @@ single_run(){
 	# Analyze the time usage
 	python3 scripts/analysis/deal_time.py -r $results_dir
 }
-
-LOCKFILE="/var/lock/real.lock"
-
-exec 9>"$LOCKFILE" || exit 1
-if ! flock -n 9; then
-  echo "Another emulation is already running. Please wait."
-  exit 1
-fi
 
 # Validate if the correct number of arguments is provided
 if [ $# -ne 3 ]; then
