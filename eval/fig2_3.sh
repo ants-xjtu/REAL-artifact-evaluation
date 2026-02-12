@@ -1,4 +1,13 @@
 #!/bin/bash
+
+LOCKFILE="/var/lock/real-ae.lock"
+
+exec 9>"$LOCKFILE" || exit 1
+if ! flock -n 9; then
+  echo "Another evaluation is already running. Please wait."
+  exit 1
+fi
+
 source .venv/bin/activate
 
 # run frr FT30 and collect extra information
