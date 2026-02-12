@@ -83,6 +83,14 @@ single_run(){
 	python3 scripts/analysis/deal_time.py -r $results_dir
 }
 
+LOCKFILE="/var/lock/real.lock"
+
+exec 9>"$LOCKFILE" || exit 1
+if ! flock -n 9; then
+  echo "Another emulation is already running. Please wait."
+  exit 1
+fi
+
 # Validate if the correct number of arguments is provided
 if [ $# -ne 3 ]; then
     echo "Usage: $0 <core> <topo_type> <topo_id>"
