@@ -184,8 +184,13 @@ def main():
 
         info = parse_from_meta(meta)
 
-        stages = read_stage_border_ts(os.path.join(run_dir, "stage_border_ts"))
-        mem_delta = read_global_mem_delta_gib(os.path.join(run_dir, "dynmem.log"))
+        try:
+            stages = read_stage_border_ts(os.path.join(run_dir, "stage_border_ts"))
+            assert len(stages) == 4
+            mem_delta = read_global_mem_delta_gib(os.path.join(run_dir, "dynmem.log"))
+        except Exception as e:
+            print(e)
+            continue
 
         c0 = stages.get("create_containers")
         c1 = stages.get("create_network")
