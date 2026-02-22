@@ -32,7 +32,7 @@ static inline void log_stub(const char *fmt, ...) {
             struct timespec _ts;\
             clock_gettime(CLOCK_MONOTONIC, &_ts);\
             long ms = _ts.tv_sec * 1000000 + _ts.tv_nsec / 1000;\
-            printf("%018ld: " fmt ": %s\n", ms, ##__VA_ARGS__, strerror(errno));\
+            printf("%018ld: Assertion failed: " fmt ": %s\n", ms, ##__VA_ARGS__, strerror(errno));\
             fflush(stdout);\
             abort();\
         }\

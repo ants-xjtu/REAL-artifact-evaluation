@@ -108,13 +108,13 @@ long gettime_ns(int clock_id = CLOCK_MONOTONIC) {
 static int read_int(int fd) {
     int ans;
     int r = read(fd, &ans, sizeof(ans));
-    assert(r > 0);
+    dbg_assert(r > 0, "read fd=%d failed r=%d errno=%d", fd, r, errno);
     return ans;
 }
 
 static void write_int(int fd, int num) {
     int r = write(fd, &num, sizeof(num));
-    assert(r == sizeof(num));
+    dbg_assert(r == sizeof(num), "write fd=%d num=%d failed r=%d errno=%d", fd, num, r, errno);
     return;
 }
 
@@ -146,6 +146,29 @@ int init_socket()
     dbg_assert(r == 0, "Listen failed");
 
     return msg_manager_socket;
+}
+
+int init_idle_socket()
+{
+    int sockfd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    dbg_assert(sockfd >= 0, "Idle socket creation failed");
+
+    struct sockaddr_un addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, MNG_ACTVCNT_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+
+    unlink(MNG_ACTVCNT_SOCKET_PATH);
+    int r = bind(sockfd, (struct sockaddr *)&addr, sizeof(addr));
+    dbg_assert(r == 0, "bind(%d, %s) failed", sockfd, MNG_ACTVCNT_SOCKET_PATH);
+
+    r = chmod(MNG_ACTVCNT_SOCKET_PATH, 0666);
+    dbg_assert(r == 0, "chmod(%s, 0666) failed", MNG_ACTVCNT_SOCKET_PATH);
+
+    r = listen(sockfd, MAX_CONNS);
+    dbg_assert(r == 0, "Idle listen failed");
+
+    return sockfd;
 }
 
 #ifdef ITER_CONV
@@ -221,7 +244,7 @@ static std::tuple<
         int host_idx = 0, currhost_size = 0;
         // ensure the same order on different machine
         for (auto u : all_parts_sorted[i]) {
-            assert(host_idx < nhosts);
+            dbg_assert(host_idx < nhosts, "host_idx=%d < nhosts=%d failed", host_idx, nhosts);
             host_nodes[host_idx].insert(u);
             if (host_idx == self_host_idx) {
                 local_parts[i].insert(u);
@@ -430,7 +453,7 @@ void stage_transition(bool has_event)
             if (Channel::n_channel < nch_target) {
                 break;
             }
-            assert(Channel::n_channel == nch_target);
+            dbg_assert(Channel::n_channel == nch_target, "n_channel=%d != nch_target=%d", Channel::n_channel.load(), nch_target);
             local_stage_end = true;
             n_ready_host++;
             for (int hid = 0; hid < glb_nhosts; ++hid) {
@@ -609,7 +632,7 @@ void worker_main(int worker_id)
 {
     tid = worker_id;
 
-    int timeout = 200; // ms
+    int timeout = 1; // ms
     int epfd = epoll_create(MAX_CONNS);
     if (epfd < 0) {
         perror("epoll_create failed");
@@ -625,12 +648,19 @@ void worker_main(int worker_id)
     };
     epoll_ctl(epfd, EPOLL_CTL_ADD, ctrl_fd, &ev);
 
-    std::unordered_set<int> managed_nodes;
+    std::vector<int> managed_nodes;
     for (int i = worker_id ?: nthreads; i <= n_nodes; i += nthreads) {
         if (local_nodes.test(i)) {
-            managed_nodes.insert(i);
+            managed_nodes.push_back(i);
         }
     }
+
+    int active_nodeid_idx = 0;
+    bool seen_busy = false;
+    long active_ts = gettime_ns();
+    const long MAX_ACTIVE_TIME = 1'000'000;
+    std::bitset<MAX_CLIENTS> idle_nodes;
+    std::map<int, int> node_blocking_fd;
 
     int nev;
     while ((nev = epoll_wait(epfd, events, MAX_CONNS, timeout)) >= 0) {
@@ -662,7 +692,7 @@ void worker_main(int worker_id)
                     } else {
                         LOG("[%3d, %3d] connect(fd=%d, self_id=%d, peer_id=%d) EAGAIN\n",
                             i, j, ch_fd, i, j);
-                        assert(connect_errno == EAGAIN);
+                        dbg_assert(connect_errno == EAGAIN, "connect_errno=%d (EAGAIN=%d) not EAGAIN for [%d,%d] fd=%d", connect_errno, EAGAIN, i, j, ch_fd);
                         g_channel_manager.make_channel(ch_fd, epfd, i, j, EPOLLIN | EPOLLOUT, Channel::CONN_INPROGRESS);
                     }
                     break;
@@ -672,7 +702,7 @@ void worker_main(int worker_id)
                     int u = read_int(ctrl_fd);
                     int v = read_int(ctrl_fd);
                     LOG("accept() = %d (%d -> %d)\n", ch_fd, u, v);
-                    assert(ch_fd >= 0);
+                    dbg_assert(ch_fd >= 0, "ch_fd(=%d) >= 0 failed", ch_fd);
                     g_channel_manager.make_channel(ch_fd, epfd, u, v, EPOLLIN, Channel::ACCEPTED);
                     LOG("recv passive %d @ thread %d\n", ch_fd, worker_id);
                     break;
@@ -680,9 +710,39 @@ void worker_main(int worker_id)
                 case 2: { // shutdown
                     return;
                 }
+                case 3: { // idle event
+                    int nodeid = read_int(ctrl_fd);
+                    int blocking_fd = read_int(ctrl_fd);
+                    int busy = read_int(ctrl_fd);
+                    if (!busy) {
+                        // dbg_assert(!idle_nodes.test(nodeid), "nodeid=%d already in idle_nodes", nodeid);
+                        idle_nodes.set(nodeid);
+                        if (node_blocking_fd.count(nodeid)) {
+                            printf("[WARN] node %d already has a blocking fd %d\n", nodeid, node_blocking_fd[nodeid]);
+                            close(node_blocking_fd[nodeid]);
+                            node_blocking_fd.erase(nodeid);
+                        }
+                        if (stage == STAGE_CONVERGE || stage == STAGE_RESTORE) {
+                            // disable r2i in buildup/teardown phase
+                            node_blocking_fd[nodeid] = blocking_fd;
+                        } else {
+                            // immediately unblock the node
+                            close(blocking_fd);
+                        }
+                    } else {
+                        dbg_assert(idle_nodes.test(nodeid), "nodeid=%d not in idle_nodes", nodeid);
+                        // Following assertion is incorrect:
+                        // become busy can happen when a node is first idle too long (>20ms), then finally got job to do
+                        // dbg_assert(nodeid == managed_nodes[active_nodeid_idx], "nodeid=%d != managed_nodes[%d]=%d", nodeid, active_nodeid_idx, managed_nodes[active_nodeid_idx]);
+                        idle_nodes.reset(nodeid);
+                        seen_busy = true;
+                    }
+                    LOG("recv idle event @ node %d (fd=%d, busy=%d)\n", nodeid, blocking_fd, busy);
+                    break;
+                }
                 default: {
                     LOG("cmd=%d\n", cmd);
-                    assert(0);
+                    dbg_assert(0, "unexpected cmd=%d", cmd);
                 }
                 }
                 continue;
@@ -699,7 +759,7 @@ void worker_main(int worker_id)
                 continue;
             }
             if (channel->state() == Channel::CONN_INPROGRESS) {
-                assert(event & EPOLLOUT);
+                dbg_assert(event & EPOLLOUT, "event=%x missing EPOLLOUT for fd=%d", event, fd);
                 LOG("outcoming connect() success, fd=%d, event = %x\n", fd, event);
                 // out coming connect()s
                 if (event & (~(EPOLLIN | EPOLLOUT))) {
@@ -753,24 +813,56 @@ void worker_main(int worker_id)
             }
         }
         if (stage != STAGE_TEARDOWN) {
-        // if (stage == STAGE_CONVERGE || stage == STAGE_RESTORE) {
-            for (auto nid : managed_nodes) {
-                g_replay_mnger.node_replay_one_msg(nid);
+            for (auto n : managed_nodes) {
+                while (g_replay_mnger.node_replay_one_msg(n))
+                    ;
             }
         }
         if (external_event) {
             write_int(ctrl_rev_fd, 1);
         }
+        if (managed_nodes.empty()) {
+            continue;
+        }
+        long now_ts = gettime_ns();
+        int active_nodeid = managed_nodes[active_nodeid_idx];
+        bool idle_too_long = (!seen_busy && now_ts - active_ts > MAX_ACTIVE_TIME);
+        bool idle_after_busy = (seen_busy && idle_nodes.test(active_nodeid));
+        if (idle_too_long || idle_after_busy) {
+            if (idle_too_long) {
+                // [r2i TODO]: ideally a node should be idle and require unblocking from controller from the start.
+                // assert(idle_nodes.test(active_nodeid));
+                // printf("node %d idle for %dms\n", active_nodeid, (int)(MAX_ACTIVE_TIME / 1'000'000));
+            }
+            // don't reset it yet, reset until next time it's scheduled
+            active_nodeid_idx++;
+            if (active_nodeid_idx == (int)managed_nodes.size()) {
+                active_nodeid_idx = 0;
+            }
+            active_nodeid = managed_nodes[active_nodeid_idx];
+            auto newnode_fd_iter = node_blocking_fd.find(active_nodeid);
+            // [r2i TODO]: ideally this should always hold.
+            // currently all nodes are "not idle" at the beginning,
+            // until first captured by us
+            if (idle_nodes.test(active_nodeid) && newnode_fd_iter != node_blocking_fd.end()) {
+                // unblock the node
+                close(newnode_fd_iter->second);
+                node_blocking_fd.erase(newnode_fd_iter);
+            }
+            // don't reset it in idle_nodes, defer until notified busy
+            seen_busy = false;
+            active_ts = now_ts;
+        }
     }
 }
 
-void acceptor_main(int thread_id, int msg_manager_socket)
+void acceptor_main(int thread_id, int msg_manager_socket, int idle_socket)
 {
     tid = thread_id;
 
     int timeout = 200; // ms
     int epfd = epoll_create(MAX_CONNS);
-    if (epfd< 0) {
+    if (epfd < 0) {
         perror("epoll_create failed");
         return;
     }
@@ -781,6 +873,8 @@ void acceptor_main(int thread_id, int msg_manager_socket)
         }
     };
     epoll_ctl(epfd, EPOLL_CTL_ADD, msg_manager_socket, &ev);
+    ev.data.fd = idle_socket;
+    epoll_ctl(epfd, EPOLL_CTL_ADD, idle_socket, &ev);
 
     int acceptor_ctrl_fd = ctrl_pipe[tid][0];
     ev.data.fd = acceptor_ctrl_fd;
@@ -792,10 +886,43 @@ void acceptor_main(int thread_id, int msg_manager_socket)
         for (int i = 0; i < nev; ++i) {
             int event = events[i].events;
             int fd = events[i].data.fd;
+            if (fd == idle_socket) {
+                // Accept idle notification
+                struct sockaddr_un src;
+                socklen_t slen = sizeof(src);
+                int cfd = accept4(idle_socket, (sockaddr*)&src, &slen, SOCK_CLOEXEC);
+                if (cfd < 0) {
+                    LOG("idle accept4 failed errno=%d (%s)\n", errno, strerror(errno));
+                    printf("idle accept4 failed errno=%d (%s)\n", errno, strerror(errno));
+                    continue;
+                }
+
+                int nodeid = read_int(cfd);
+                int busy = read_int(cfd);
+
+                int worker_id = nodeid % nthreads;
+                int worker_ctrl_fd = ctrl_pipe[worker_id][1];
+
+                // cmd=3: idle event
+                {
+                    std::unique_lock lock(worker_ctrl_pipe_mutex[worker_id]);
+                    write_int(worker_ctrl_fd, 3);
+                    write_int(worker_ctrl_fd, nodeid);
+                    write_int(worker_ctrl_fd, cfd);
+                    write_int(worker_ctrl_fd, busy);
+                }
+                if (busy) {
+                    close(cfd);
+                }
+                // otherwise defer until worker unblocks the node
+                LOG("recv idle event @ node=%d (fd=%d, busy=%d) -> worker=%d\n", nodeid, cfd, busy, worker_id);
+                // printf("recv idle event @ node=%d (fd=%d, busy=%d) -> worker=%d\n", nodeid, cfd, busy, worker_id);
+                continue;
+            }
             if (fd != msg_manager_socket) {
                 if (fd == acceptor_ctrl_fd) {
                     int r = read_int(acceptor_ctrl_fd);
-                    assert(r == 2);
+                    dbg_assert(r == 2, "expected r=2 but got r=%d", r);
                     return;
                 }
                 // rejected ch_fd
@@ -803,12 +930,12 @@ void acceptor_main(int thread_id, int msg_manager_socket)
                 if ((event & (~(EPOLLIN | EPOLLOUT))) == 0) {
                     continue;
                 }
-                assert(0 == epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL));
+                dbg_assert(0 == epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL), "epoll_ctl DEL failed fd=%d errno=%d", fd, errno);
                 close(fd);
                 continue;
             }
-            assert(fd == msg_manager_socket);
-            assert(event == EPOLLIN);
+            dbg_assert(fd == msg_manager_socket, "fd=%d != msg_manager_socket", fd);
+            dbg_assert(event == EPOLLIN, "event=%x != EPOLLIN", event);
             // 1. accept()
             // 2. parse the peer id according to uds address
             // 3. monitor the new fd_ epoll_ctl
@@ -825,7 +952,7 @@ void acceptor_main(int thread_id, int msg_manager_socket)
                 do {
                     // TODO: don't block here
                     int r = read(ch_fd, ((char *)&syn) + n_read, synsiz - n_read);
-                    assert(r > 0);
+                    dbg_assert(r > 0, "read failed n_read=%d r=%d errno=%d", n_read, r, errno);
                     n_read += r;
                 } while (n_read < synsiz);
                 real_synack_t synack;
@@ -837,7 +964,7 @@ void acceptor_main(int thread_id, int msg_manager_socket)
                 do {
                     // TODO: don't block here
                     int r = write(ch_fd, ((char *)&synack) + n_written, synacksiz - n_written);
-                    assert(r > 0);
+                    dbg_assert(r > 0, "write failed n_written=%d r=%d errno=%d", n_written, r, errno);
                     n_written += r;
                 } while (n_written < synacksiz);
                 LOG("rejected\n");
@@ -861,6 +988,7 @@ void acceptor_main(int thread_id, int msg_manager_socket)
 
 int main(int argc, char *argv[]) {
     int msg_manager_socket = init_socket();
+    int idle_socket = init_idle_socket();
 
     int timeout = 200; // ms
     long max_runtime_ns = 0;
@@ -880,7 +1008,7 @@ int main(int argc, char *argv[]) {
     glb_parts_nchannel = parts_nchannel_; glb_parts_nchannel_cut = parts_nchannel_cut_; neighborList = neighborList_;
     n_parts = all_parts_.size() - 1;
     n_nodes = glb_G.size() - 1;
-    assert(n_parts != 1);
+    dbg_assert(n_parts != 1, "n_parts=%d cannot be 1", n_parts);
 
     for (auto u : host_nodes[host_idx]) {
         local_nodes.set(u);
@@ -893,7 +1021,7 @@ int main(int argc, char *argv[]) {
     }
 
     n_parts = local_parts_.size() - 1;
-    assert(n_parts != 1);
+    dbg_assert(n_parts != 1, "n_parts=%d cannot be 1", n_parts);
 
     if (n_parts > 0) {
         glb_local_cut = glb_local_parts[n_parts];
@@ -966,9 +1094,9 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i <= nthreads; ++i) {
         int r;
         r = pipe(ctrl_pipe[i]);
-        assert(r == 0);
+        dbg_assert(r == 0, "pipe(ctrl_pipe[%d]) failed errno=%d", i, errno);
         r = pipe(ctrl_rev_pipe[i]);
-        assert(r == 0);
+        dbg_assert(r == 0, "pipe(ctrl_rev_pipe[%d]) failed errno=%d", i, errno);
         struct epoll_event ev = (struct epoll_event) {
             .events = EPOLLIN,
             .data = (union epoll_data) {
@@ -979,7 +1107,7 @@ int main(int argc, char *argv[]) {
         if (i < nthreads) {
             threads[i] = std::thread(worker_main, i);
         } else {
-            threads[i] = std::thread(acceptor_main, i, msg_manager_socket);
+            threads[i] = std::thread(acceptor_main, i, msg_manager_socket, idle_socket);
         }
     }
     for (int i = 0; i < nhosts; i++) {
@@ -1018,7 +1146,7 @@ int main(int argc, char *argv[]) {
         LOG("epoll_wait() = %d\n", nev);
         for (int i = 0; i < nev; ++i) {
             int event = events[i].events;
-            assert(event == EPOLLIN);
+            dbg_assert(event == EPOLLIN, "event=%x != EPOLLIN", event);
             int fd = events[i].data.fd;
             // fd is ctrl_rev_pipe or remote_ctrl_rev_pipe
             // currently only for last_msg_ts update, just read cmd and ignore
