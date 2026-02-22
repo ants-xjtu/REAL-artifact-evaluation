@@ -1178,6 +1178,7 @@ int main(int argc, char *argv[]) {
         threads[i].join();
     }
 
+    g_channel_manager.export_latency_csv();
     g_replay_mnger.export_iolog();
     return 0;
 }
