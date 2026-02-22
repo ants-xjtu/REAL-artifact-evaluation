@@ -69,6 +69,7 @@ extern thread_local bool tls_init_done;
 #define BGP_PORT 179
 
 #define MNG_SOCKET_PATH "/ripc/msg_manager_socket"
+#define MNG_ACTVCNT_SOCKET_PATH "/ripc/actvcnt_manager_socket"
 
 enum RealMsgType {
     REAL_SYN = 1,
@@ -265,6 +266,9 @@ void lib_init();
 int get_port();
 
 PRELOAD0_DECL(getpid, pid_t)
+PRELOAD1_DECL(exit, void, int, status)
+PRELOAD2_DECL(pthread_setname_np, int, pthread_t, thread, const char *, name)
+// PRELOAD3_DECL(waitpid, pid_t, pid_t, pid, int *, wstatus, int, options)
 PRELOAD2_DECL(getservbyname, struct servent *, const char *, name, const char *, proto)
 PRELOAD3_DECL(write, ssize_t, int, fd, const void *, buf, size_t, count)
 PRELOAD3_DECL(read, ssize_t, int, fd, void *, buf, size_t, count)
@@ -325,6 +329,8 @@ PRELOAD2_DECL(clock_gettime, int, clockid_t, clk_id, struct timespec *, tp)
 PRELOAD0_DECL(if_nameindex, struct if_nameindex *)
 PRELOAD1_DECL(if_freenameindex, void, struct if_nameindex *, ptr)
 // TODO: int getifaddrs(struct ifaddrs **ifap);
+PRELOAD3_DECL(wait3, pid_t, int *, wstatus, int, options, struct rusage *, rusage)
+PRELOAD4_DECL(wait4, pid_t, pid_t, pid, int *, wstatus, int, options, struct rusage *, rusage)
 
 #define READ_UNTIL(fd, buf, goal)\
     {\

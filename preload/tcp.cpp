@@ -232,7 +232,7 @@ ssize_t tcp_fdesc::read(void *buf, size_t count)
     }
 
     ssize_t ret;
-    LOG("tcp_fdesc::read(buf=%p, count=%d)\n", buf, (int)count);
+    LOG("tcp_fdesc::read(fd=%d, buf=%p, count=%d)\n", this->fd, buf, (int)count);
 
     if (this->pollhup) {
         LOG("pollhup\n");
