@@ -1,0 +1,10 @@
+cores: ["all"]
+topos: [["fattree", "24"], ["fattree", "26"], ["fattree", "28"], ["fattree", "30"]]
+tag: ae-fig13-baseline
+image: frr
+mode: preload
+partitioned: false
+debug: false
+time: 120
+profile: true
+sched_mode: baseline

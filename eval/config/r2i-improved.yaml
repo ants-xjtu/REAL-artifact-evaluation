@@ -1,0 +1,10 @@
+cores: ["all"]
+topos: [["fattree", "30"]]
+tag: ae-r2i-improved
+image: frr
+mode: preload
+partitioned: false
+debug: false
+sched_mode: improved
+time: 120
+profile: true
