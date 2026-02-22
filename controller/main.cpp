@@ -722,6 +722,7 @@ void worker_main(int worker_id)
                             close(node_blocking_fd[nodeid]);
                             node_blocking_fd.erase(nodeid);
                         }
+#ifndef R2I_DISABLED
                         if (stage == STAGE_CONVERGE || stage == STAGE_RESTORE) {
                             // disable r2i in buildup/teardown phase
                             node_blocking_fd[nodeid] = blocking_fd;
@@ -729,6 +730,10 @@ void worker_main(int worker_id)
                             // immediately unblock the node
                             close(blocking_fd);
                         }
+#else
+                        // R2I disabled: always unblock the node immediately
+                        close(blocking_fd);
+#endif
                     } else {
                         dbg_assert(idle_nodes.test(nodeid), "nodeid=%d not in idle_nodes", nodeid);
                         // Following assertion is incorrect:
@@ -752,6 +757,9 @@ void worker_main(int worker_id)
             dbg_assert(channel != nullptr, "channel @ fd(%d) == nullptr", fd);
             if (event & (~(EPOLLIN | EPOLLOUT))) {
                 LOG("fd=%d pollerr()\n", fd);
+                if (stage != STAGE_TEARDOWN) {
+                    fprintf(stderr, "channel %d -> %d deleted\n", channel->self_id(), channel->peer_id());
+                }
                 bool destroy = channel->pollerr(event & (~(EPOLLIN | EPOLLOUT)));
                 if (destroy) {
                     g_channel_manager.delete_channel(fd);
@@ -946,7 +954,11 @@ void acceptor_main(int thread_id, int msg_manager_socket, int idle_socket)
             dbg_assert(ch_fd >= 0, "errno: %d, sunpath = %s, socklen=%d", errno, uds_srcaddr.sun_path, socklen);
             sscanf(uds_srcaddr.sun_path, "/ripc/emu-real-%d/%d", &u, &v);
             LOG("accept() = %d (%d -> %d)\n", ch_fd, u, v);
+#ifdef TWO_PHASE_DISABLED
+            if (!!g_channel_manager.get(u, v) || !g_channel_manager.get(v, u) || !allow_connect(u, v)) {
+#else
             if (!!g_channel_manager.get(u, v) || !allow_connect(u, v)) {
+#endif
                 real_syn_t syn;
                 int n_read = 0;
                 do {

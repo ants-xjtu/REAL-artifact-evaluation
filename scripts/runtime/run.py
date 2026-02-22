@@ -19,6 +19,14 @@ mode: baseline # baseline,preload
 partitioned: false # enable iter-conv or not
 debug: false # Enable debug or not, collects log from libpreload. This impacts performance.
 
+# (Optional) scheduling mode for R2I evaluation
+# Default: default
+# Options:
+#   - default: R2I disabled, 2-phase enabled
+#   - baseline: R2I disabled, 2-phase disabled
+#   - improved: R2I enabled, 2-phase enabled
+sched_mode: default
+
 # (Optional) estimated converge time (or longer)
 # Default: 60
 # The script will wait for this long for converge
@@ -67,6 +75,7 @@ def run_simulation(cfg):
     tag = cfg.get("tag", "")
     image = cfg.get("image", "")
     mode = cfg.get("mode", "")
+    sched_mode = cfg.get("sched_mode", "default")
     wait_time = str(cfg.get("time", 60))
     debug = str(cfg.get("debug", False)) == "True"
     partitioned = cfg.get("partitioned", False)
@@ -124,6 +133,8 @@ def run_simulation(cfg):
                 timestamp,
                 "-C",
                 cores,
+                "-M",
+                sched_mode,
             ]
 
             if partitioned:
@@ -149,6 +160,7 @@ def run_simulation(cfg):
                 "partitioned": str(partitioned),
                 "debug": str(bool(debug)),
                 "profile": str(bool(profile)),
+                "sched_mode": sched_mode,
                 "wait_time": wait_time,
             }
             write_meta_txt(results_dir, meta)

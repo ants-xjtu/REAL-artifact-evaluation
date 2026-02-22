@@ -32,6 +32,20 @@ run_case() {
         ctrl_flags="$ctrl_flags ITER_CONV=1"
         boot_flags="$boot_flags -p"
     fi
+
+    # Handle sched_mode -> build flags
+    case "$sched_mode" in
+        baseline)
+            ctrl_flags="$ctrl_flags R2I_DISABLED=1 TWO_PHASE_DISABLED=1"
+            ;;
+        improved)
+            # No flags - R2I enabled, 2-phase enabled (default behavior)
+            ;;
+        default|*)
+            ctrl_flags="$ctrl_flags R2I_DISABLED=1"
+            ;;
+    esac
+
     make ${ctrl_flags} -C controller
     cp -r ./controller/ ${results_dir}/controller/
     chmod a+rwx ${results_dir}/controller/

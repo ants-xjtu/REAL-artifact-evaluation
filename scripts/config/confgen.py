@@ -366,7 +366,7 @@ exit-address-family
             neighbor_config += f"neighbor {neighbor['neighbor_ip']} remote-as {neighbor['remote_as']}\n"
             neighbor_config += f"neighbor {neighbor['neighbor_ip']} timers 0 0\n"
             neighbor_config += (
-                f"neighbor {neighbor['neighbor_ip']} timers connect 240\n"
+                f"neighbor {neighbor['neighbor_ip']} timers connect 5\n"
             )
             neighbor_activate += f"neighbor {neighbor['neighbor_ip']} activate\n"
 

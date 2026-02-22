@@ -10,6 +10,14 @@ ifeq ($(ITER_CONV), 1)
     cppflags += -DITER_CONV
 endif
 
+ifeq ($(R2I_DISABLED), 1)
+    cppflags += -DR2I_DISABLED
+endif
+
+ifeq ($(TWO_PHASE_DISABLED), 1)
+    cppflags += -DTWO_PHASE_DISABLED
+endif
+
 SRC_FILES = \
 	main.cpp \
 	channel.cpp \
