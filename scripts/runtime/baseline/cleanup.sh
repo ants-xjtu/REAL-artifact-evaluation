@@ -29,9 +29,9 @@ collect_info() {
     do
         if [ "$image" == "frr" ]; then
             mkdir -p ${results_dir}/node_logs/$name/
-            timeout -k 100 1 ./lwc/target/release/lwc exec ${name} bash -c "vtysh -c 'show ip bgp summary' &> /var/log/real/bgp_summary-final.log" || true
+            timeout -k 100 50 ./lwc/target/release/lwc exec ${name} bash -c "vtysh -c 'show ip bgp summary' &> /var/log/real/bgp_summary-final.log" || true
             ./lwc/target/release/lwc cp ${name}:/var/log/real/bgp_summary-final.log  "${results_dir}/node_logs/${name}/bgp_summary-final.log" || true
-            timeout -k 100 1 ./lwc/target/release/lwc exec ${name} bash -c "vtysh -c 'show bgp all' &> /var/log/real/bgp_routes-final.log" || true
+            timeout -k 100 50 ./lwc/target/release/lwc exec ${name} bash -c "vtysh -c 'show bgp all' &> /var/log/real/bgp_routes-final.log" || true
             ./lwc/target/release/lwc cp ${name}:/var/log/real/bgp_routes-final.log  "${results_dir}/node_logs/${name}/bgp_routes-final.log" || true
         elif [ "$image" == "crpd" ]; then
             mkdir -p ${results_dir}/node_logs/$name/
