@@ -64,7 +64,7 @@ def bg_breakdown():
 
     ax = pivot.plot(kind="bar")
     ax.set_yscale("log")
-    ax.set_ylim(10,6000)
+    ax.set_ylim(1,6000)
     ax.tick_params(axis="x", rotation=0)
 
     plt.xlabel("Topology")
