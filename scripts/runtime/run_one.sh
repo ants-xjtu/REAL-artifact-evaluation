@@ -20,10 +20,11 @@ bindcore=""
 debug=false
 partitioned=false
 profile=false
+sched_mode=default
 wait_time=20
 timestamp=""
 
-while getopts "i:T:c:m:t:C:d:w:x:DsbpP" opt; do
+while getopts "i:T:c:m:t:C:d:w:x:DsbpPM:" opt; do
     case $opt in
         i) image=$OPTARG ;;
         T) topo=$OPTARG ;;
@@ -38,6 +39,7 @@ while getopts "i:T:c:m:t:C:d:w:x:DsbpP" opt; do
         b) bindcore="-b" ;;
         p) partitioned=true ;;
         P) profile=true ;;
+        M) sched_mode=$OPTARG ;;
         *) echo "Invalid option: -$opt" ; exit 1 ;;
     esac
 done

@@ -1,0 +1,10 @@
+cores: ["all"]
+topos: [["fattree", "24"], ["fattree", "30"]]
+tag: ae-fig13-improved
+image: frr
+mode: preload
+partitioned: false
+debug: false
+time: 120
+profile: true
+sched_mode: improved

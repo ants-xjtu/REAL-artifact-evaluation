@@ -46,7 +46,17 @@ If everything goes well, all figures in the paper should show up in `eval/figure
 - Fig10:
     - This figure compares the convergence time and network buildup time **between REAL and default runtime**.
     - Claim: REAL should have shorter or comparable convergence time, and much faster network buildup time.
-- Fig11-13: TBD
+- Fig11:
+    - This figure shows the Cumulative Distribution Function (CDF) of channel latency comparing the improved two-phase scheduling with the baseline.
+    - Claim: the two-phase scheduling should show lower latency (curve shifted to the left) compared to baseline.
+- Fig12:
+    - This figure shows an event chart visualization of when different BGP routers get CPU time during convergence with the run-to-idle scheduling.
+    - Claim: the scheduling events should be more concentrated and less scattered compared to baseline (Fig2).
+- Fig13:
+    - This figure shows the convergence time and LLC (Last Level Cache) miss rate comparison between REAL and baseline scheduling across different topologies.
+    - Claims:
+        1. REAL should achieve shorter or comparable convergence time;
+        2. The LLC miss rate should be lower for REAL due to concentrated cache access patterns, thanks to run-to-idle scheduling.
 - Fig14:
     - This figure shows the time-memory tradeoff with iterative convergence.
     - Claim: Memory could be decreased by 6x or more with increased number of partitions. The price of increased time is affordable (within 6x in most cases) and is worth the huge memory saving.

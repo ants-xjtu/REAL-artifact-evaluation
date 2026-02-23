@@ -103,6 +103,7 @@ def parse_from_meta(meta):
     topo_type = meta.get("topo_type", "")
     topo_id = meta.get("topo_id", "")
     topo = meta.get("topo", "")
+    tag = meta.get("tag", "")
 
     parts = ""
     if meta.get("partitioned", "False") != "False":
@@ -125,6 +126,7 @@ def parse_from_meta(meta):
         "Parts": parts,
         "image": image,
         "mode": mode,
+        "tag": tag,
     }
 
 
@@ -208,6 +210,7 @@ def main():
             "Parts": info["Parts"],
             "image": info["image"],
             "mode": info["mode"],
+            "tag": info["tag"],
             "bootup": safe_round(bootup),
             "create_network": safe_round(create_network),
             "converge": safe_round(converge),
@@ -253,7 +256,7 @@ def main():
 
 
     fieldnames = [
-        "id", "Topo", "Parts", "image", "mode",
+        "id", "Topo", "Parts", "image", "mode", "tag",
         "bootup", "create_network",
         "converge", "time", "global mem"
     ]

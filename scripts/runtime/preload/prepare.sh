@@ -41,6 +41,8 @@ prepare() {
         ./lwc/target/release/lwc remove $name) &
     done
     rm -rf /opt/lwc/volumes/ripc/*
+    rm -rf /dev/shm/actvcnt-*
+    rm -rf /dev/shm/port-*
 
     wait
 

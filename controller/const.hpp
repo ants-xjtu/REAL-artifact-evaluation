@@ -3,6 +3,7 @@
 #include <cstdint>
 
 constexpr const char* MNG_SOCKET_PATH = "/opt/lwc/volumes/ripc/msg_manager_socket";
+constexpr const char *MNG_ACTVCNT_SOCKET_PATH = "/opt/lwc/volumes/ripc/actvcnt_manager_socket";
 constexpr long MAX_THREADS = 64;
 constexpr long MAX_HOSTS = 64;
 constexpr long MAX_CLIENTS = 20000;

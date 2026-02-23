@@ -147,6 +147,302 @@ int get_port() {
     return glb_self_port_end->fetch_add(1);
 }
 
+class r2i_condvar {
+public:
+    bool blocked;
+    bool busy;
+    int active_thread_cnt;
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    // following 2 functions assumes mutex is already held
+    int curr_thread_active_withlock() {
+        int old = active_thread_cnt;
+        active_thread_cnt++;
+        return old;
+    }
+    int curr_thread_idle_withlock() {
+        int old = active_thread_cnt;
+        active_thread_cnt--;
+        if (old <= 0) {
+            LOG_ALWAYS("[actv] ERROR: curr_thread_idle_withlock called when counter is %d\n", active_thread_cnt);
+            exit(-1);
+        }
+        return old;
+    }
+    // following 2 functions assumes mutex is not held yet
+    int curr_thread_active() {
+        pthread_mutex_lock(&mutex);
+        int old = curr_thread_active_withlock();
+        pthread_mutex_unlock(&mutex);
+        return old;
+    }
+    int curr_thread_idle() {
+        pthread_mutex_lock(&mutex);
+        int old = curr_thread_idle_withlock();
+        pthread_mutex_unlock(&mutex);
+        return old;
+    }
+    void block_withlock() {
+        blocked = true;
+    }
+    void block() {
+        pthread_mutex_lock(&mutex);
+        block_withlock();
+        pthread_mutex_unlock(&mutex);
+    }
+    void unblock_withlock() {
+        blocked = false;
+    }
+    void unblock() {
+        pthread_mutex_lock(&mutex);
+        unblock_withlock();
+        pthread_mutex_unlock(&mutex);
+    }
+};
+
+static thread_local struct r2i_condvar *glb_r2i_condvar = nullptr;
+static thread_local bool r2i_enabled = false;
+
+static void initialize_active_counter() {
+    char shm_name[128];
+
+    sprintf(shm_name, "/actvcnt-%d", tls_selfid);
+
+    // Use O_EXCL for atomic initialization - only one process succeeds
+    // VERIFIED FACT: Shared memory is cleaned in scripts/runtime/preload/prepare.sh line 44
+    int fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, 0666);
+    if (fd < 0 && errno != EEXIST) {
+        perror("actvcnt shm_open failed");
+        exit(-1);
+    }
+    if (fd >= 0) {
+        // We won the race - we are the initializer
+        LOG("[actv] won initialization race for node %d\n", tls_selfid);
+
+        // Set size
+        if (ftruncate(fd, sizeof(r2i_condvar)) < 0) {
+            perror("ftruncate failed");
+            close(fd);
+            shm_unlink(shm_name);
+            exit(-1);
+        }
+
+        // Map shared memory
+        void *ptr = mmap(nullptr, sizeof(r2i_condvar),
+                         PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        if (ptr == MAP_FAILED) {
+            perror("mmap failed");
+            close(fd);
+            shm_unlink(shm_name);
+            exit(-1);
+        }
+
+        // Initialize the structure
+        glb_r2i_condvar = (r2i_condvar*)ptr;
+        glb_r2i_condvar->active_thread_cnt = 0;
+        glb_r2i_condvar->blocked = false;
+        // this ensures the first event is idle, not busy
+        glb_r2i_condvar->busy = true;
+
+        pthread_mutexattr_t mutex_attr;
+        if (pthread_mutexattr_init(&mutex_attr) != 0) {
+            perror("pthread_mutexattr_init failed");
+            exit(-1);
+        }
+        if (pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED) != 0) {
+            perror("pthread_mutexattr_setpshared failed");
+            exit(-1);
+        }
+        if (pthread_mutex_init(&glb_r2i_condvar->mutex, &mutex_attr) != 0) {
+            perror("pthread_mutex_init failed");
+            exit(-1);
+        }
+        pthread_mutexattr_destroy(&mutex_attr);
+
+        pthread_condattr_t cond_attr;
+        if (pthread_condattr_init(&cond_attr) != 0) {
+            perror("pthread_condattr_init failed");
+            exit(-1);
+        }
+        if (pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED) != 0) {
+            perror("pthread_condattr_setpshared failed");
+            exit(-1);
+        }
+        if (pthread_cond_init(&glb_r2i_condvar->cond, &cond_attr) != 0) {
+            perror("pthread_cond_init failed");
+            exit(-1);
+        }
+        pthread_condattr_destroy(&cond_attr);
+
+        LOG_ALWAYS("[actv] r2i_condvar initialized with PTHREAD_PROCESS_SHARED\n");
+    } else if (errno == EEXIST) {
+        // Another process won the race - just open and map
+        LOG("[actv] lost initialization race for node %d, opening existing\n", tls_selfid);
+
+        fd = shm_open(shm_name, O_RDWR, 0666);
+        if (fd < 0) {
+            perror("shm_open failed (shouldn't happen)");
+            exit(-1);
+        }
+
+        void *ptr = mmap(nullptr, sizeof(r2i_condvar),
+                         PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        if (ptr == MAP_FAILED) {
+            perror("mmap failed");
+            close(fd);
+            exit(-1);
+        }
+
+        glb_r2i_condvar = (r2i_condvar*)ptr;
+        LOG_ALWAYS("[actv] r2i_condvar already initialized by another process\n");
+    }
+    // This have to be kept, otherwise there'll be permission issues.
+    // TODO: investigate this
+    // [r2i TODO]: check original mod first in log for debugging
+    if (fchmod(fd, 0666) < 0) {
+        perror("actvcnt fchmod");
+    }
+
+    PRELOAD_ORIG(close);
+    // [r2i TODO]: is it ok to close the fd?
+    close_orig(fd);
+}
+
+void thread_register_active_counter() {
+    if (!r2i_enabled) {
+        initialize_active_counter();
+        r2i_enabled = true;
+        int prev = glb_r2i_condvar->curr_thread_active();
+        LOG("[actv] thread_register: actvcnt %d -> %d\n", prev, prev + 1);
+        LOG_ALWAYS("[actv] thread_register: actvcnt %d -> %d\n", prev, prev + 1);
+    }
+}
+
+void thread_unregister_active_counter() {
+    if (r2i_enabled) {
+        r2i_enabled = false;
+        int prev = glb_r2i_condvar->curr_thread_idle();
+        LOG("[actv] thread_unregister: actvcnt %d -> %d\n", prev, prev - 1);
+        LOG_ALWAYS("[actv] thread_unregister: actvcnt %d -> %d\n", prev, prev - 1);
+    }
+}
+
+static int notify_active_state(int busy) {
+    PRELOAD_ORIG(socket);
+    PRELOAD_ORIG(connect);
+    PRELOAD_ORIG(write);
+    PRELOAD_ORIG(close);
+    int fd = socket_orig(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    struct sockaddr_un addr = { .sun_family = AF_UNIX };
+    strncpy(addr.sun_path, MNG_ACTVCNT_SOCKET_PATH, sizeof(addr.sun_path) - 1);
+    ssize_t r = connect_orig(fd, (const struct sockaddr *)&addr, sizeof(addr));
+    debug_assert(r == 0);
+    write_orig(fd, &tls_selfid, sizeof(tls_selfid));
+    write_orig(fd, &busy, sizeof(busy));
+    return fd;
+}
+
+void thread_yield() {
+    // Safety check: glb_r2i_condvar must be initialized when r2i_enabled is true
+    // r2i_enabled == true implies glb_r2i_condvar != nullptr (set in thread_register_active_counter)
+    debug_assert(r2i_enabled == false || glb_r2i_condvar != nullptr);
+    if (!r2i_enabled) {
+        return;
+    }
+
+    /**
+     * Decrease the counter.
+     */
+    pthread_mutex_lock(&glb_r2i_condvar->mutex);
+    int prev = glb_r2i_condvar->curr_thread_idle_withlock();
+    bool already_blocked = glb_r2i_condvar->blocked;
+    if (prev == 1 && !already_blocked) {
+        glb_r2i_condvar->block_withlock();
+        glb_r2i_condvar->busy = false;
+    }
+    pthread_mutex_unlock(&glb_r2i_condvar->mutex);
+
+    LOG("[actv] thread_yield: actvcnt %d -> %d\n", prev, prev - 1);
+    if (prev - 1 != 0 || already_blocked) {
+        return;
+    }
+
+    /**
+     * Tell the controller we're idle.
+     */
+    LOG_ALWAYS("[actv] node %d goes idle\n", tls_selfid);
+    LOG("[actv] node %d goes idle\n", tls_selfid);
+    int fd = notify_active_state(0);
+
+    /**
+     * Block at controller.
+     */ 
+    int perm = 0;
+    PRELOAD_ORIG(read);
+    ssize_t r = read_orig(fd, &perm, sizeof(perm));
+
+    /**
+     * Unblocked by controller.
+     */ 
+    PRELOAD_ORIG(close);
+    if (r != 0) {
+        LOG_ALWAYS("[actv] ERROR: thread_yield: read()=%ld: %s\n", r, strerror(errno));
+        close_orig(fd);
+        exit(-1);
+        return;
+    }
+    // Controller closed fd, we got EOF (r == 0)
+    close_orig(fd);
+    // Atomically increment counter and signal condvar
+    pthread_mutex_lock(&glb_r2i_condvar->mutex);
+    glb_r2i_condvar->unblock_withlock();
+    pthread_cond_broadcast(&glb_r2i_condvar->cond);  // Wake up one waiting thread
+    pthread_mutex_unlock(&glb_r2i_condvar->mutex);
+
+    LOG("[actv] thread_yield: unblocked by controller, actvcnt not changed yet\n");
+    return;
+}
+
+static void thread_resume() {
+    // Safety check: glb_r2i_condvar must be initialized when r2i_enabled is true
+    // r2i_enabled == true implies glb_r2i_condvar != nullptr (set in thread_register_active_counter)
+    debug_assert(r2i_enabled == false || glb_r2i_condvar != nullptr);
+    if (!r2i_enabled) {
+        return;
+    }
+    // block on condvar until unblocked
+    pthread_mutex_lock(&glb_r2i_condvar->mutex);
+    while (glb_r2i_condvar->blocked) {
+        LOG("[actv] thread_resume: waiting on condvar (cnt=0)\n");
+        int rc = pthread_cond_wait(&glb_r2i_condvar->cond,
+                                    &glb_r2i_condvar->mutex);
+        if (rc != 0) {
+            LOG_ALWAYS("[actv] pthread_cond_wait failed: %s\n", strerror(rc));
+            // Continue anyway - mutex is locked, recheck condition in while loop
+            // If error is fatal (e.g., corrupted condvar), loop will timeout or hang
+        }
+    }
+    // Counter is > 0, increment it while still holding mutex
+    int prev = glb_r2i_condvar->curr_thread_active_withlock();
+    bool should_notify = false;
+    if (prev == 0 && !glb_r2i_condvar->busy) {
+        glb_r2i_condvar->busy = true;
+        should_notify = true;
+    }
+    pthread_mutex_unlock(&glb_r2i_condvar->mutex);
+    LOG("[actv] thread_resume: actvcnt %d -> %d\n", prev, prev + 1);
+    if (!should_notify) {
+        return;
+    }
+    /**
+     * Tell the controller we're busy.
+     */
+    LOG("[actv] node %d goes busy\n", tls_selfid);
+    int fd = notify_active_state(1);
+    PRELOAD_ORIG(close);
+    close_orig(fd);
+}
+
 char *get_cmdline() {
     char path[256];
     snprintf(path, sizeof(path), "/proc/self/cmdline");
@@ -182,6 +478,13 @@ static int alloc_ifidx() {
     }
     glb_ifmap.insert(idx);
     return idx;
+}
+
+static inline std::string get_tname() {
+    char buf[32];
+    int rc = pthread_getname_np(pthread_self(), buf, 32);
+    if (rc != 0) { buf[0] = '\0'; }
+    return buf;
 }
 
 void lib_init()
@@ -291,6 +594,25 @@ void lib_init()
 
     glb_fdset.set_nht_ready(tls_selfid);
     log_user_info();
+    std::string progname = get_tname();
+    LOG("%d: %s\n", gettid(), progname.c_str());
+
+    if ((progname == "zebra" || progname == "bgpd")
+        // filter out RCU sweeper
+        // futex uses syscall and cannot be intercepted, progname is not reliable (sometimes cannot see RCU sweeper name)
+        && thread_id != 29 && thread_id != 36)
+        thread_register_active_counter();
+}
+
+PRELOAD2(pthread_setname_np, int, pthread_t, thread, const char *, name)
+{
+    PRELOAD_ORIG(pthread_setname_np);
+    LOG("[actv] setname: %s\n", name);
+    std::string tname(name);
+    if (tname == "bgpd_ka" || tname == "zebra_dplane") {
+        thread_unregister_active_counter();
+    }
+    return pthread_setname_np_orig(thread, name);
 }
 
 PRELOAD2(getservbyname, struct servent *, const char *, name, const char *, proto)
@@ -643,6 +965,7 @@ PRELOAD0(fork, pid_t)
         LOG("cmdline: %s\n", cmdline);
         free(cmdline);
 #endif
+        thread_resume();
     }
     LOG("Hijacked fork()=%d\n", ret);
     return ret;
@@ -1392,7 +1715,10 @@ ppoll_impl(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, const 
 
     int r;
     thread_local static struct pollfd kfds[1024];
-
+    struct timespec zero_tmo = {
+        .tv_sec = 0,
+        .tv_nsec = 0,
+    };
     // malloc_trim(0);
 
     r = glb_fdset.poll_fastpath(fds, kfds, nfds);
@@ -1401,7 +1727,12 @@ ppoll_impl(struct pollfd *fds, nfds_t nfds, const struct timespec *tmo_p, const 
         goto ppoll_return;
     }
 
-    r = ppoll_orig(kfds, nfds, tmo_p, sigmask);
+    r = ppoll_orig(kfds, nfds, &zero_tmo, sigmask);
+    if (r == 0) {
+        thread_yield();
+        r = ppoll_orig(kfds, nfds, tmo_p, sigmask);
+        thread_resume();
+    }
     if (r < 0) {
         return r;
     }
@@ -1761,8 +2092,27 @@ PRELOAD0(getpid, pid_t)
         fprintf(stderr, "change getpid() from %d to 1\n", pid);
         return 1;
     } else {
-        return pid;   
+        return pid;
     }
+}
+
+// PRELOAD3(waitpid, pid_t, pid_t, pid, int *, wstatus, int, options)
+// {
+//     PRELOAD_ORIG(waitpid);
+//     LOG("waitpid(), yielding\n");
+//     thread_yield();
+//     pid_t ret = waitpid_orig(pid, wstatus, options);
+//     thread_resume();
+//     return ret;
+// }
+
+PRELOAD1(exit, void, int, status)
+{
+    PRELOAD_ORIG(exit);
+    LOG("exit(), yielding\n");
+    thread_yield();
+    exit_orig(status);
+    __builtin_unreachable();
 }
 
 PRELOAD0(if_nameindex, struct if_nameindex *)
@@ -1782,3 +2132,21 @@ PRELOAD1(if_freenameindex, void, struct if_nameindex *, ptr)
 // unsigned int if_nametoindex(const char *ifname);
 // char *if_indextoname(unsigned int ifindex, char *ifname);
 // int getifaddrs(struct ifaddrs **ifap);
+
+PRELOAD3(wait3, pid_t, int *, wstatus, int, options, struct rusage *, rusage)
+{
+    PRELOAD_ORIG(wait3);
+    thread_yield();
+    pid_t r = wait3_orig(wstatus, options, rusage);
+    thread_resume();
+    return r;
+}
+
+PRELOAD4(wait4, pid_t, pid_t, pid, int *, wstatus, int, options, struct rusage *, rusage)
+{
+    PRELOAD_ORIG(wait4);
+    thread_yield();
+    pid_t r = wait4_orig(pid, wstatus, options, rusage);
+    thread_resume();
+    return r;
+}

@@ -5,4 +5,4 @@ image: frr
 mode: baseline
 partitioned: false
 debug: false
-time: 300
+time: 100

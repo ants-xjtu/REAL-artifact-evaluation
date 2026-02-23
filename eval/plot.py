@@ -64,7 +64,7 @@ def bg_breakdown():
 
     ax = pivot.plot(kind="bar")
     ax.set_yscale("log")
-    ax.set_ylim(10,6000)
+    ax.set_ylim(1,6000)
     ax.tick_params(axis="x", rotation=0)
 
     plt.xlabel("Topology")
@@ -136,6 +136,7 @@ def eventchart_pernode(
     figsize=None,
     xlabel=None,
     title=None,
+    stage_border_ts_file="eval/data/stage_border_ts",
 ):
     global pid2gid, pid2comm, max_gid
     pid2gid = {}
@@ -143,7 +144,7 @@ def eventchart_pernode(
     max_gid = 0
 
     comm_filter = comm_filter or []
-    real_start_ts = parse_converge_ts("eval/data/stage_border_ts")
+    real_start_ts = parse_converge_ts(stage_border_ts_file)
     data, row_set = parse_perf_pernode(perf_file, pid_file, comm_filter, real_start_ts)
 
     comm_ind = {comm: i for i, comm in enumerate(sorted(comm_filter))}
@@ -654,32 +655,49 @@ def cdf_latency(
 ):
     if legend_map is None:
         legend_map = {
-            "two_phase": "With Two-Phase",
-            "no_two_phase": "Without Two-Phase",
+            "two-phase": "With Two-Phase",
+            "no-two-phase": "Without Two-Phase",
         }
 
-    df = pd.read_csv(csv_file)
+    df = pd.read_csv(csv_file, dtype={time_col: float})
     groups = dict(tuple(df.groupby(group_col)))
     if plot_order is None:
         plot_order = list(groups.keys())
 
     _, ax = plt.subplots(figsize=figsize)
 
+    global_max = 0.0
     for conf in plot_order:
         if conf not in groups:
             continue
         values = np.sort(groups[conf][time_col].values)
+        if len(values) > 0:
+            global_max = max(global_max, values[-1])
+
+    global_max += 1
+
+    for conf in plot_order:
+        if conf not in groups:
+            continue
+        values = np.sort(groups[conf][time_col].values)
+        if len(values) == 0:
+            continue
+        # Add anchor points: (0, 0) at start and (max_x, 1) at end
+        values_with_anchors = np.concatenate([[0], values, [global_max]])
         y = np.arange(1, len(values) + 1) / len(values)
+        y_with_anchors = np.concatenate([[0], y, [1]])
         label = legend_map.get(conf, conf)
-        ax.plot(values, y, label=label, linewidth=1.8)
+        ax.plot(values_with_anchors, y_with_anchors, label=label, linewidth=1.8)
 
     ax.set_xlabel(xlabel)
     ax.set_ylabel(ylabel)
     if title:
         ax.set_title(title)
 
+    ax.set_xlim(0, global_max)
+
     plt.tight_layout()
-    return {"loc": "lower right"}
+    return {"loc": "upper left", "framealpha": 0.6}
 
 
 def barline_time_llcmiss(
@@ -696,7 +714,7 @@ def barline_time_llcmiss(
     figsize=None,
     xlabel="Topology",
     ylabel_left="Time (s)",
-    ylabel_right="LLC Miss Rate",
+    ylabel_right="LLC Miss Rate (%)",
     title=None,
 ):
     df = pd.read_csv(csv_file)
@@ -705,7 +723,10 @@ def barline_time_llcmiss(
         legend_map = {c: c for c in df[category_col].unique()}
 
     if group_order is None:
-        group_order = list(df[group_col].unique())
+        group_order = df[group_col].unique()
+
+    group_order = list(filter(lambda g : g in df[group_col].unique(), group_order))
+
     if category_order is None:
         category_order = list(df[category_col].unique())
 
@@ -749,8 +770,8 @@ def barline_time_llcmiss(
     ax2.set_ylabel(ylabel_right)
     ax1.set_xticks(x)
     ax1.set_xticklabels(group_order)
-    ax1.set_ylim(0, 170)
-    ax2.set_ylim(0, 1.6)
+    ax1.set_ylim(0, 100)
+    ax2.set_ylim(0, 100)
 
     if title:
         ax1.set_title(title)
@@ -1087,43 +1108,22 @@ def build_jobs():
         "fig9e": ("eval/figures/fig9e.pdf", lambda: e2e(images="bird", yvalue="global mem", log=False, y_label="Peak Memory (GB)")),
         "fig9f": ("eval/figures/fig9f.pdf", lambda: e2e(images="crpd", yvalue="global mem", log=False, y_label="Peak Memory (GB)")),
         "fig10": ("eval/figures/fig10.pdf", lambda: breakdown_stacked(images="frr")),
-        "fig11a": (
-            "eval/figures/fig11a.pdf",
+        "fig11": (
+            "eval/figures/fig11.pdf",
             lambda: cdf_latency(
-                csv_file="eval/data/ft32-cdf.csv",
+                csv_file="eval/data/cdf.csv",
                 plot_order=["two-phase", "no-two-phase"],
                 legend_map={"two-phase": "Two-Phase", "no-two-phase": "W/O Two-Phase"},
                 figsize=(3.2, 2),
             ),
         ),
-        "fig11b": (
-            "eval/figures/fig11b.pdf",
-            lambda: cdf_latency(
-                csv_file="eval/data/ft28-cdf.csv",
-                plot_order=["two-phase", "no-two-phase"],
-                legend_map={"two-phase": "Two-Phase", "no-two-phase": "W/O Two-Phase"},
-                figsize=(3.2, 2),
-            ),
-        ),
-        "fig12a": (
-            "eval/figures/fig12a.pdf",
-            lambda: eventchart_pernode(
-                "eval/data/r2i_no2phase_converge.perf",
-                pid_file="eval/data/r2i_no2phase_pid_to_dockername",
-                comm_filter=[],
-                real_start_ts=46925.0,
-                figsize=(3.5, 2.8),
-                xlabel=None,
-                title=None,
-            ),
-        ),
-        "fig12b": (
-            "eval/figures/fig12b.pdf",
+        "fig12": (
+            "eval/figures/fig12.pdf",
             lambda: eventchart_pernode(
                 "eval/data/r2i_converge.perf",
                 pid_file="eval/data/r2i_pid_to_dockername",
                 comm_filter=[],
-                real_start_ts=69365.0,
+                stage_border_ts_file="eval/data/r2i_stage_border_ts",
                 figsize=(3.5, 2.8),
                 xlabel=None,
                 title=None,
@@ -1134,9 +1134,9 @@ def build_jobs():
             lambda: barline_time_llcmiss(
                 csv_file="eval/data/two-phase.csv",
                 figsize=(4.2, 3.2 * 3 / 4.7),
-                group_order=["FT24", "FT28", "FT32", "FT36"],
-                category_order=["r2i", "nor2i"],
-                legend_map={"nor2i": "W/O", "r2i": "W"},
+                group_order=["FT24", "FT26", "FT28", "FT30"],
+                category_order=["improved", "baseline"],
+                legend_map={"baseline": "W/O", "improved": "W"},
             ),
         ),
         "fig14": ("eval/figures/fig14.pdf", lambda: e2e_time_mem_ratio("FT30")),

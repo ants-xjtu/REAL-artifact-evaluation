@@ -1,14 +1,27 @@
 #pragma once
 
+#include <cerrno>
+
 extern "C" {
 
 #include <time.h>
 #include <assert.h>
 #include <stdio.h>
+#include <string.h>
 
 }
 
 extern thread_local int thread_id;
+
+#define LOG_ALWAYS(...) \
+    {\
+        struct timespec _ts;\
+        clock_gettime_orig(CLOCK_MONOTONIC, &_ts);\
+        long ms = _ts.tv_sec * 1000000 + _ts.tv_nsec / 1000;\
+        fprintf(stderr, "%018ld S%d: ", ms, thread_id);\
+        fprintf(stderr, ##__VA_ARGS__); \
+        fflush(stderr); \
+    }
 
 #ifdef PRELOAD_DEBUG
 
@@ -45,7 +58,7 @@ extern int (*clock_gettime_orig)(clockid_t, struct timespec *);
 
 static void debug_assert_failed(const char *cond_str, const char *file, int line) {
     // Print filename, line number and condition
-    fprintf(stderr, "Assertion failed: (%s), file %s, line %d.\n", cond_str, file, line);
+    fprintf(stderr, "Assertion failed: (%s), file %s, line %d, error(%d)=%s.\n", cond_str, file, line, errno, strerror(errno));
     assert(0);
 }
 

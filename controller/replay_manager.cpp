@@ -53,6 +53,7 @@ void ReplayManager::add_msg(std::shared_ptr<Message> &msg, int src_id, int dst_i
     std::unique_lock lock(node_mutex_[dst_id]);
     this->try_flush_delayed_msg(dst_id);
     real_hdr_t *hdr = (real_hdr_t *)msg->data();
+#ifndef TWO_PHASE_DISABLED
     int bgp_type = BGP_TYPE((real_pld_t *)msg->data() + 1);
     if (stage == STAGE_CONVERGE || bgp_type == BGP_KEEPALIVE || bgp_type == BGP_OPEN) {
         msg_list_[dst_id].push_back({src_id, gettime_ns(), msg});
@@ -63,6 +64,11 @@ void ReplayManager::add_msg(std::shared_ptr<Message> &msg, int src_id, int dst_i
         LOG("delayed add_msg: %d => %d, type %s, size %d\n",
             src_id, dst_id, msg_type_name[hdr->msg_type], hdr->msg_len);
     }
+#else
+    msg_list_[dst_id].push_back({src_id, gettime_ns(), msg});
+    LOG("add_msg: %d => %d, type %s, size %d, seq = %ld\n",
+            src_id, dst_id, msg_type_name[hdr->msg_type], hdr->msg_len, msg_list_[dst_id].size());
+#endif
 }
 
 bool ReplayManager::node_replay_one_msg(int node_id)
@@ -105,8 +111,11 @@ bool ReplayManager::node_replay_one_msg(int node_id)
     // always replay BGP_OPEN and BGP_KEEPALIVE
     u_char bgp_type = BGP_TYPE((real_pld_t *)msg->data() + 1);
     if (bgp_type != BGP_OPEN && bgp_type != BGP_KEEPALIVE) {
-        // if (stage == STAGE_TEARDOWN) {
+#ifdef TWO_PHASE_DISABLED
+        if (stage == STAGE_TEARDOWN) {
+#else
         if (stage != STAGE_CONVERGE && stage != STAGE_RESTORE) {
+#endif
             LOG("replay_one_msg(%d, bgp_type=%d) failed due to invalid stage\n", node_id, bgp_type);
             return false;
         }

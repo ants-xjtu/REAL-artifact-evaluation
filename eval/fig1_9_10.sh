@@ -15,7 +15,7 @@ if [ "$#" -eq 1 ] && [ "$1" = "complete" ]; then
     mode="complete"
 fi
 
-./run.sh eval/config/$mode
+./run.sh eval/config/$mode/fig9
 cd batfish
 ./run.sh 64 fattree 24
 ./run.sh 64 fattree 28
