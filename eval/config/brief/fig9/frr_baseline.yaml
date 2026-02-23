@@ -1,8 +1,8 @@
 cores: ["all"]
-topos: [["fattree", "28"], ["topozoo", "Kdl"]]
+topos: [["fattree", "24"], ["topozoo", "Kdl"]]
 tag: ae
 image: frr
 mode: baseline
 partitioned: false
 debug: false
-time: 300
+time: 100
