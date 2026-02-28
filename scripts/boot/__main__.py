@@ -65,7 +65,7 @@ def main():
     local_nodes = set()
     for part in parts:
         part_size = len(part)
-        perhost_size = (part_size + nhosts - 1) / nhosts
+        perhost_size = (part_size + nhosts - 1) // nhosts
         host_idx = 0
         currhost_size = 0
         for u in sorted(part):

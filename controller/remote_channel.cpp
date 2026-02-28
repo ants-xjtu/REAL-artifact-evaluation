@@ -5,7 +5,7 @@
 #include <iostream>
 
 RemoteChannel::RemoteChannel(int fd, int host_id, int epoll_fd):
-    fd_(fd), host_id_(host_id), epoll_fd_(epoll_fd), events_(EPOLLIN),
+    fd_(fd), host_id_(host_id), epoll_fd_(epoll_fd), events_(EPOLLIN | EPOLLRDHUP),
     rb_in_(1 << 20), rb_out_(1 << 20) {}
 
 void RemoteChannel::send_eos(int stage) {
