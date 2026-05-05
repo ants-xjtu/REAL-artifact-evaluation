@@ -43,3 +43,22 @@ All runs processed successfully.
 ## Detailed Instructions
 
 See [the evaluation guide](./EVALUATION_GUIDE.md) for the artifact claims and the instructions to reproduce the main results of the paper.
+
+## Citation
+
+If you find the code useful, please consider citing our paper.
+
+```bibtex
+@inproceedings {316726,
+author = {Ze Xia and Hao Li and Jinyu Fu and Xin Wan and Yihan Dang and Danfeng Shan and Li Chen and Peng Zhang},
+title = {{REAL}: Emulating Control Plane at {Simulator{\textquoteright}s} Cost},
+booktitle = {23rd USENIX Symposium on Networked Systems Design and Implementation (NSDI 26)},
+year = {2026},
+isbn = {978-1-939133-54-0},
+address = {Renton, WA},
+pages = {1861--1877},
+url = {https://www.usenix.org/conference/nsdi26/presentation/xia},
+publisher = {USENIX Association},
+month = may
+}
+```
